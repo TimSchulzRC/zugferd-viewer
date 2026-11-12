@@ -11,6 +11,8 @@ services:
     environment:
       - SERVICE_URL_WEB_3000
       - APP_URL=${SERVICE_URL_WEB}
+      # Only needed when `web` has several domains: the one people actually open.
+      - PUBLIC_URL=${PUBLIC_URL:-}
       - BETTER_AUTH_SECRET=${SERVICE_BASE64_64_AUTH}
       - DATABASE_URL=postgres://zugferd:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/zugferd
       - VALIDATOR_URL=http://validator:8080
@@ -19,7 +21,7 @@ services:
       - S3_BUCKET=${S3_BUCKET:?}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:?}
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:?}
-      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_REGION=${S3_REGION:-}
       - LETTERMINT_TOKEN=${LETTERMINT_TOKEN:?}
       - MAIL_FROM=${MAIL_FROM:?}
       - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID:-}

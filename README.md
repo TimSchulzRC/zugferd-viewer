@@ -30,10 +30,11 @@ Coolify erzeugt selbst: die öffentliche URL (`SERVICE_URL_WEB`), das Datenbankp
 | Variable | Pflicht | Bedeutung |
 | --- | --- | --- |
 | `ADMIN_EMAIL` | ja | Erster Administrator. Diese Adresse kann sich immer anmelden und andere einladen. |
-| `S3_ENDPOINT` | ja | z. B. `https://s3.example.com` |
+| `S3_ENDPOINT` | ja | z. B. `https://s3.example.com`, ohne Schema gilt https |
 | `S3_BUCKET` | ja | Der Bucket muss existieren. |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | ja | |
-| `S3_REGION` | nein | Standard `us-east-1` |
+| `S3_REGION` | nein | Standard `us-east-1`, bei Hetzner der Standort aus dem Endpunkt |
+| `PUBLIC_URL` | nein | Nur bei mehreren Domains: die Adresse, über die Nutzer die App öffnen |
 | `LETTERMINT_TOKEN` | ja | Sending-Token des Lettermint-Projekts |
 | `MAIL_FROM` | ja | z. B. `ZUGFeRD Viewer <rechnungen@example.com>`, die Domain muss bei Lettermint verifiziert sein |
 | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID` | nein | Schaltet „Mit Microsoft anmelden“ frei, sobald alle drei gesetzt sind |

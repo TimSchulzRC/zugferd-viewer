@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { migrateAppTables, pool } from "./db";
 import { env, microsoft } from "./env";
 import { sendLoginCode } from "./mail";
+import { checkBucket } from "./storage";
 
 function create() {
   const { APP_URL, BETTER_AUTH_SECRET } = env();
@@ -79,7 +80,9 @@ export function ready(): Promise<void> {
     const { runMigrations } = await getMigrations(auth().options);
     await runMigrations();
     await migrateAppTables();
-    const { ADMIN_EMAIL } = env();
+    const { ADMIN_EMAIL, APP_URL } = env();
+    console.log(`Public URL: ${APP_URL}`);
+    void checkBucket();
     await createUser(ADMIN_EMAIL, "admin");
     await pool().query(`update "user" set role = 'admin' where email = $1 and role is distinct from 'admin'`, [ADMIN_EMAIL]);
   })());

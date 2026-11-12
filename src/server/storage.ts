@@ -1,4 +1,4 @@
-import { DeleteObjectsCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectsCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { env } from "./env";
 
 const globals = globalThis as { zugferdS3?: S3Client };
@@ -11,7 +11,22 @@ function client() {
     credentials: { accessKeyId: S3_ACCESS_KEY_ID, secretAccessKey: S3_SECRET_ACCESS_KEY },
     // Self-hosted S3 rarely has a DNS name per bucket.
     forcePathStyle: true,
+    // The SDK's newer default adds CRC32 checksums to every request, which S3 servers other than AWS often reject.
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
   }));
+}
+
+/** Says in the server log at startup whether the bucket is usable, so a wrong S3 setting shows before the first upload. */
+export async function checkBucket() {
+  const { S3_BUCKET, S3_ENDPOINT, S3_REGION } = env();
+  try {
+    await client().send(new HeadBucketCommand({ Bucket: S3_BUCKET }));
+    console.log(`S3 ready: bucket reachable at ${S3_ENDPOINT} (region ${S3_REGION})`);
+  } catch (error) {
+    const { name, message, $metadata } = error as { name?: string; message?: string; $metadata?: { httpStatusCode?: number } };
+    console.error(`S3 NOT ready: ${S3_ENDPOINT} (region ${S3_REGION}) answered ${$metadata?.httpStatusCode ?? "no status"} ${name ?? ""} ${message ?? ""}`);
+  }
 }
 
 export async function putObject(key: string, body: Uint8Array, contentType: string) {
