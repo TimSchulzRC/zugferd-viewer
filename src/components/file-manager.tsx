@@ -240,7 +240,8 @@ export function FileManager() {
         }}
       />
 
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+      <header className="shrink-0 border-b">
+        <div className="mx-auto flex h-12 w-full max-w-6xl items-center gap-2 px-3">
         <nav aria-label="Pfad" className="flex min-w-0 flex-1 items-center gap-0.5 text-sm">
           {crumbs.map((crumb, index) => {
             const last = index === crumbs.length - 1;
@@ -293,6 +294,7 @@ export function FileManager() {
           </>
         )}
         <UserMenu />
+        </div>
       </header>
 
       <ContextMenu>
@@ -307,10 +309,11 @@ export function FileManager() {
                 if (!(event.target as HTMLElement).closest("[data-row]")) setSelected(new Set());
               }}
               {...dropProps(ordner, "list")}
-              className={cn("@container min-h-0 flex-1 overflow-auto outline-none", dropTarget === "list" && "bg-primary/5 ring-2 ring-primary ring-inset")}
+              className={cn("min-h-0 flex-1 overflow-auto outline-none", dropTarget === "list" && "bg-primary/5 ring-2 ring-primary ring-inset")}
             />
           }
         >
+          <div className="@container mx-auto w-full max-w-6xl">
           <div role="row" className={cn(GRID, "sticky top-0 z-10 h-9 border-b bg-background text-xs text-muted-foreground")}>
             {COLUMNS.map((column) => (
               <button
@@ -400,6 +403,7 @@ export function FileManager() {
               </Button>
             </div>
           )}
+          </div>
         </ContextMenuTrigger>
 
         <ContextMenuContent className="min-w-48">
