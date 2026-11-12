@@ -1,0 +1,2526 @@
+{
+ "source": "xrechnung-visualization (KoSIT), cii-xr.xsl + l10n/de.xml",
+ "topLevel": [
+  "BT-1",
+  "BT-2",
+  "BT-3",
+  "BT-5",
+  "BT-6",
+  "BT-7",
+  "BT-8",
+  "BT-9",
+  "BT-10",
+  "BT-11",
+  "BT-12",
+  "BT-13",
+  "BT-14",
+  "BT-15",
+  "BT-16",
+  "BT-17",
+  "BT-18",
+  "BT-19",
+  "BT-20",
+  "BG-1",
+  "BG-2",
+  "BG-3",
+  "BG-4",
+  "BG-7",
+  "BG-10",
+  "BG-11",
+  "BG-13",
+  "BG-14",
+  "BT-81",
+  "BT-82",
+  "BT-83",
+  "BG-17",
+  "BG-18",
+  "BG-19",
+  "BG-20",
+  "BG-21",
+  "BG-22",
+  "BG-23",
+  "BG-24",
+  "BG-25"
+ ],
+ "terms": {
+  "BT-1": {
+   "id": "BT-1",
+   "label": "Rechnungsnummer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:ID"
+    }
+   ],
+   "children": []
+  },
+  "BT-2": {
+   "id": "BT-2",
+   "label": "Rechnungsdatum",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IssueDateTime/udt:DateTimeString"
+    }
+   ],
+   "children": []
+  },
+  "BT-3": {
+   "id": "BT-3",
+   "label": "Rechnungsart",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:TypeCode"
+    }
+   ],
+   "children": []
+  },
+  "BT-5": {
+   "id": "BT-5",
+   "label": "Währung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:InvoiceCurrencyCode"
+    }
+   ],
+   "children": []
+  },
+  "BT-6": {
+   "id": "BT-6",
+   "label": "Code der Umsatzsteuerwährung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:TaxCurrencyCode"
+    }
+   ],
+   "children": []
+  },
+  "BT-8": {
+   "id": "BT-8",
+   "label": "Code des Umsatzsteuer-Abrechnungsdatums",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:DueDateTypeCode"
+    }
+   ],
+   "children": []
+  },
+  "BT-9": {
+   "id": "BT-9",
+   "label": "Fälligkeitsdatum",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradePaymentTerms/ram:DueDateDateTime/udt:DateTimeString"
+    }
+   ],
+   "children": []
+  },
+  "BT-10": {
+   "id": "BT-10",
+   "label": "Käuferreferenz",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerReference"
+    }
+   ],
+   "children": []
+  },
+  "BT-11": {
+   "id": "BT-11",
+   "label": "Projektnummer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SpecifiedProcuringProject/ram:ID"
+    }
+   ],
+   "children": []
+  },
+  "BT-12": {
+   "id": "BT-12",
+   "label": "Vertragsnummer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:ContractReferencedDocument/ram:IssuerAssignedID"
+    }
+   ],
+   "children": []
+  },
+  "BT-13": {
+   "id": "BT-13",
+   "label": "Bestellnummer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerOrderReferencedDocument/ram:IssuerAssignedID"
+    }
+   ],
+   "children": []
+  },
+  "BT-14": {
+   "id": "BT-14",
+   "label": "Auftragsnummer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerOrderReferencedDocument/ram:IssuerAssignedID"
+    }
+   ],
+   "children": []
+  },
+  "BT-15": {
+   "id": "BT-15",
+   "label": "Kennung der Empfangsbestätigung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ReceivingAdviceReferencedDocument/ram:IssuerAssignedID"
+    }
+   ],
+   "children": []
+  },
+  "BT-16": {
+   "id": "BT-16",
+   "label": "Kennung der Versandanzeige",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:DespatchAdviceReferencedDocument/ram:IssuerAssignedID"
+    }
+   ],
+   "children": []
+  },
+  "BT-17": {
+   "id": "BT-17",
+   "label": "Vergabenummer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:AdditionalReferencedDocument/ram:IssuerAssignedID",
+     "when": [
+      {
+       "up": 1,
+       "child": "ram:TypeCode",
+       "in": [
+        "50"
+       ]
+      }
+     ]
+    }
+   ],
+   "children": []
+  },
+  "BT-18": {
+   "id": "BT-18",
+   "label": "Objektkennung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:AdditionalReferencedDocument/ram:IssuerAssignedID",
+     "when": [
+      {
+       "up": 1,
+       "child": "ram:TypeCode",
+       "in": [
+        "130"
+       ]
+      }
+     ]
+    }
+   ],
+   "children": []
+  },
+  "BT-19": {
+   "id": "BT-19",
+   "label": "Kontierungsinformation",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:ReceivableSpecifiedTradeAccountingAccount/ram:ID"
+    }
+   ],
+   "children": []
+  },
+  "BT-20": {
+   "id": "BT-20",
+   "label": "Skonto; weitere Zahlungsbedingungen",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradePaymentTerms/ram:Description"
+    }
+   ],
+   "children": []
+  },
+  "BG-1": {
+   "id": "BG-1",
+   "label": "INVOICE NOTE",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IncludedNote"
+    }
+   ],
+   "children": [
+    "BT-21",
+    "BT-22"
+   ]
+  },
+  "BT-21": {
+   "id": "BT-21",
+   "label": "Betreff",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IncludedNote/ram:SubjectCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-1"
+  },
+  "BT-22": {
+   "id": "BT-22",
+   "label": "Bemerkung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IncludedNote/ram:Content"
+    }
+   ],
+   "children": [],
+   "parent": "BG-1"
+  },
+  "BG-2": {
+   "id": "BG-2",
+   "label": "PROCESS CONTROL",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:ExchangedDocumentContext"
+    }
+   ],
+   "children": [
+    "BT-23",
+    "BT-24"
+   ]
+  },
+  "BT-23": {
+   "id": "BT-23",
+   "label": "Prozesskennung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:ExchangedDocumentContext/ram:BusinessProcessSpecifiedDocumentContextParameter/ram:ID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-2"
+  },
+  "BT-24": {
+   "id": "BT-24",
+   "label": "Spezifikationskennung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:ExchangedDocumentContext/ram:GuidelineSpecifiedDocumentContextParameter/ram:ID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-2"
+  },
+  "BG-3": {
+   "id": "BG-3",
+   "label": "PRECEDING INVOICE REFERENCE",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:InvoiceReferencedDocument"
+    }
+   ],
+   "children": [
+    "BT-25",
+    "BT-26"
+   ]
+  },
+  "BT-25": {
+   "id": "BT-25",
+   "label": "Rechnungsnummer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:InvoiceReferencedDocument/ram:IssuerAssignedID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-3"
+  },
+  "BT-26": {
+   "id": "BT-26",
+   "label": "Rechnungsdatum",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:InvoiceReferencedDocument/ram:FormattedIssueDateTime/qdt:DateTimeString"
+    }
+   ],
+   "children": [],
+   "parent": "BG-3"
+  },
+  "BG-4": {
+   "id": "BG-4",
+   "label": "SELLER",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty"
+    }
+   ],
+   "children": [
+    "BT-27",
+    "BT-28",
+    "BT-29",
+    "BT-30",
+    "BT-31",
+    "BT-32",
+    "BT-33",
+    "BT-34",
+    "BG-5",
+    "BG-6"
+   ]
+  },
+  "BT-27": {
+   "id": "BT-27",
+   "label": "Firmenname",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:Name"
+    }
+   ],
+   "children": [],
+   "parent": "BG-4"
+  },
+  "BT-28": {
+   "id": "BT-28",
+   "label": "Abweichender Handelsname",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedLegalOrganization/ram:TradingBusinessName"
+    }
+   ],
+   "children": [],
+   "parent": "BG-4"
+  },
+  "BT-29": {
+   "id": "BT-29",
+   "label": "Kennung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:ID"
+    },
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:GlobalID",
+     "when": [
+      {
+       "up": 0,
+       "attr": "schemeID",
+       "exists": true
+      }
+     ]
+    }
+   ],
+   "children": [],
+   "parent": "BG-4"
+  },
+  "BT-30": {
+   "id": "BT-30",
+   "label": "Register-/Registriernummer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedLegalOrganization/ram:ID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-4"
+  },
+  "BT-31": {
+   "id": "BT-31",
+   "label": "Umsatzsteuer-ID",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedTaxRegistration/ram:ID",
+     "when": [
+      {
+       "up": 0,
+       "attr": "schemeID",
+       "in": [
+        "VA"
+       ]
+      }
+     ]
+    }
+   ],
+   "children": [],
+   "parent": "BG-4"
+  },
+  "BT-32": {
+   "id": "BT-32",
+   "label": "Steuernummer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedTaxRegistration/ram:ID",
+     "when": [
+      {
+       "up": 0,
+       "attr": "schemeID",
+       "in": [
+        "FC"
+       ]
+      }
+     ]
+    }
+   ],
+   "children": [],
+   "parent": "BG-4"
+  },
+  "BT-33": {
+   "id": "BT-33",
+   "label": "Weitere rechtliche Informationen",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:Description"
+    }
+   ],
+   "children": [],
+   "parent": "BG-4"
+  },
+  "BT-34": {
+   "id": "BT-34",
+   "label": "Elektronische Adresse",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:URIUniversalCommunication/ram:URIID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-4"
+  },
+  "BG-5": {
+   "id": "BG-5",
+   "label": "SELLER POSTAL ADDRESS",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress"
+    }
+   ],
+   "children": [
+    "BT-35",
+    "BT-36",
+    "BT-162",
+    "BT-37",
+    "BT-38",
+    "BT-39",
+    "BT-40"
+   ],
+   "parent": "BG-4"
+  },
+  "BT-35": {
+   "id": "BT-35",
+   "label": "Adresszeile 1",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:LineOne"
+    }
+   ],
+   "children": [],
+   "parent": "BG-5"
+  },
+  "BT-36": {
+   "id": "BT-36",
+   "label": "Adresszeile 2",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:LineTwo"
+    }
+   ],
+   "children": [],
+   "parent": "BG-5"
+  },
+  "BT-162": {
+   "id": "BT-162",
+   "label": "Adresszeile 3",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:LineThree"
+    }
+   ],
+   "children": [],
+   "parent": "BG-5"
+  },
+  "BT-37": {
+   "id": "BT-37",
+   "label": "Ort",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:CityName"
+    }
+   ],
+   "children": [],
+   "parent": "BG-5"
+  },
+  "BT-38": {
+   "id": "BT-38",
+   "label": "PLZ",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:PostcodeCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-5"
+  },
+  "BT-39": {
+   "id": "BT-39",
+   "label": "Bundesland",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:CountrySubDivisionName"
+    }
+   ],
+   "children": [],
+   "parent": "BG-5"
+  },
+  "BT-40": {
+   "id": "BT-40",
+   "label": "Ländercode",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress/ram:CountryID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-5"
+  },
+  "BG-6": {
+   "id": "BG-6",
+   "label": "SELLER CONTACT",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact"
+    }
+   ],
+   "children": [
+    "BT-41",
+    "BT-42",
+    "BT-43"
+   ],
+   "parent": "BG-4"
+  },
+  "BT-41": {
+   "id": "BT-41",
+   "label": "Name",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact/ram:DepartmentName"
+    },
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact/ram:PersonName"
+    }
+   ],
+   "children": [],
+   "parent": "BG-6"
+  },
+  "BT-42": {
+   "id": "BT-42",
+   "label": "Telefon",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact/ram:TelephoneUniversalCommunication/ram:CompleteNumber"
+    }
+   ],
+   "children": [],
+   "parent": "BG-6"
+  },
+  "BT-43": {
+   "id": "BT-43",
+   "label": "E-Mail-Adresse",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact/ram:EmailURIUniversalCommunication/ram:URIID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-6"
+  },
+  "BG-7": {
+   "id": "BG-7",
+   "label": "BUYER",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty"
+    }
+   ],
+   "children": [
+    "BT-44",
+    "BT-45",
+    "BT-46",
+    "BT-47",
+    "BT-48",
+    "BT-49",
+    "BG-8",
+    "BG-9"
+   ]
+  },
+  "BT-44": {
+   "id": "BT-44",
+   "label": "Name",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:Name"
+    }
+   ],
+   "children": [],
+   "parent": "BG-7"
+  },
+  "BT-45": {
+   "id": "BT-45",
+   "label": "Abweichender Handelsname",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:SpecifiedLegalOrganization/ram:TradingBusinessName"
+    }
+   ],
+   "children": [],
+   "parent": "BG-7"
+  },
+  "BT-46": {
+   "id": "BT-46",
+   "label": "Kennung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:ID"
+    },
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:GlobalID",
+     "when": [
+      {
+       "up": 0,
+       "attr": "schemeID",
+       "exists": true
+      }
+     ]
+    }
+   ],
+   "children": [],
+   "parent": "BG-7"
+  },
+  "BT-47": {
+   "id": "BT-47",
+   "label": "Register-/Registriernummer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:SpecifiedLegalOrganization/ram:ID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-7"
+  },
+  "BT-48": {
+   "id": "BT-48",
+   "label": "Umsatzsteuer-ID",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:SpecifiedTaxRegistration/ram:ID",
+     "when": [
+      {
+       "up": 0,
+       "attr": "schemeID",
+       "in": [
+        "VA",
+        "VAT"
+       ]
+      }
+     ]
+    }
+   ],
+   "children": [],
+   "parent": "BG-7"
+  },
+  "BT-49": {
+   "id": "BT-49",
+   "label": "Elektronische Adresse",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:URIUniversalCommunication/ram:URIID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-7"
+  },
+  "BG-8": {
+   "id": "BG-8",
+   "label": "BUYER POSTAL ADDRESS",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress"
+    }
+   ],
+   "children": [
+    "BT-50",
+    "BT-51",
+    "BT-163",
+    "BT-52",
+    "BT-53",
+    "BT-54",
+    "BT-55"
+   ],
+   "parent": "BG-7"
+  },
+  "BT-50": {
+   "id": "BT-50",
+   "label": "Adresszeile 1",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:LineOne"
+    }
+   ],
+   "children": [],
+   "parent": "BG-8"
+  },
+  "BT-51": {
+   "id": "BT-51",
+   "label": "Adresszeile 2",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:LineTwo"
+    }
+   ],
+   "children": [],
+   "parent": "BG-8"
+  },
+  "BT-163": {
+   "id": "BT-163",
+   "label": "Adresszeile 3",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:LineThree"
+    }
+   ],
+   "children": [],
+   "parent": "BG-8"
+  },
+  "BT-52": {
+   "id": "BT-52",
+   "label": "Ort",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:CityName"
+    }
+   ],
+   "children": [],
+   "parent": "BG-8"
+  },
+  "BT-53": {
+   "id": "BT-53",
+   "label": "PLZ",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:PostcodeCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-8"
+  },
+  "BT-54": {
+   "id": "BT-54",
+   "label": "Bundesland",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:CountrySubDivisionName"
+    }
+   ],
+   "children": [],
+   "parent": "BG-8"
+  },
+  "BT-55": {
+   "id": "BT-55",
+   "label": "Ländercode",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress/ram:CountryID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-8"
+  },
+  "BG-9": {
+   "id": "BG-9",
+   "label": "BUYER CONTACT",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:DefinedTradeContact"
+    }
+   ],
+   "children": [
+    "BT-56",
+    "BT-57",
+    "BT-58"
+   ],
+   "parent": "BG-7"
+  },
+  "BT-56": {
+   "id": "BT-56",
+   "label": "Kontaktstelle",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:DefinedTradeContact/ram:DepartmentName"
+    },
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:DefinedTradeContact/ram:PersonName"
+    }
+   ],
+   "children": [],
+   "parent": "BG-9"
+  },
+  "BT-57": {
+   "id": "BT-57",
+   "label": "Telefon",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:DefinedTradeContact/ram:TelephoneUniversalCommunication/ram:CompleteNumber"
+    }
+   ],
+   "children": [],
+   "parent": "BG-9"
+  },
+  "BT-58": {
+   "id": "BT-58",
+   "label": "E-Mail-Adresse",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:DefinedTradeContact/ram:EmailURIUniversalCommunication/ram:URIID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-9"
+  },
+  "BG-10": {
+   "id": "BG-10",
+   "label": "PAYEE",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:PayeeTradeParty"
+    }
+   ],
+   "children": [
+    "BT-59",
+    "BT-60",
+    "BT-61"
+   ]
+  },
+  "BT-59": {
+   "id": "BT-59",
+   "label": "Name",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:PayeeTradeParty/ram:Name"
+    }
+   ],
+   "children": [],
+   "parent": "BG-10"
+  },
+  "BT-60": {
+   "id": "BT-60",
+   "label": "Kennung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:PayeeTradeParty/ram:GlobalID",
+     "when": [
+      {
+       "up": 0,
+       "attr": "schemeID",
+       "exists": true
+      }
+     ]
+    },
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:PayeeTradeParty/ram:ID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-10"
+  },
+  "BT-61": {
+   "id": "BT-61",
+   "label": "Register-/Registriernummer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:PayeeTradeParty/ram:SpecifiedLegalOrganization/ram:ID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-10"
+  },
+  "BG-11": {
+   "id": "BG-11",
+   "label": "SELLER TAX REPRESENTATIVE PARTY",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTaxRepresentativeTradeParty"
+    }
+   ],
+   "children": [
+    "BT-62",
+    "BT-63",
+    "BG-12"
+   ]
+  },
+  "BT-62": {
+   "id": "BT-62",
+   "label": "Name",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTaxRepresentativeTradeParty/ram:Name"
+    }
+   ],
+   "children": [],
+   "parent": "BG-11"
+  },
+  "BT-63": {
+   "id": "BT-63",
+   "label": "Umsatzsteuer-ID",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTaxRepresentativeTradeParty/ram:SpecifiedTaxRegistration/ram:ID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-11"
+  },
+  "BG-12": {
+   "id": "BG-12",
+   "label": "SELLER TAX REPRESENTATIVE POSTAL ADDRESS",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTaxRepresentativeTradeParty/ram:PostalTradeAddress"
+    }
+   ],
+   "children": [
+    "BT-64",
+    "BT-65",
+    "BT-164",
+    "BT-66",
+    "BT-67",
+    "BT-68",
+    "BT-69"
+   ],
+   "parent": "BG-11"
+  },
+  "BT-64": {
+   "id": "BT-64",
+   "label": "Adresszeile 1",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTaxRepresentativeTradeParty/ram:PostalTradeAddress/ram:LineOne"
+    }
+   ],
+   "children": [],
+   "parent": "BG-12"
+  },
+  "BT-65": {
+   "id": "BT-65",
+   "label": "Adresszeile 2",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTaxRepresentativeTradeParty/ram:PostalTradeAddress/ram:LineTwo"
+    }
+   ],
+   "children": [],
+   "parent": "BG-12"
+  },
+  "BT-164": {
+   "id": "BT-164",
+   "label": "Adresszeile 3",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTaxRepresentativeTradeParty/ram:PostalTradeAddress/ram:LineThree"
+    }
+   ],
+   "children": [],
+   "parent": "BG-12"
+  },
+  "BT-66": {
+   "id": "BT-66",
+   "label": "Ort",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTaxRepresentativeTradeParty/ram:PostalTradeAddress/ram:CityName"
+    }
+   ],
+   "children": [],
+   "parent": "BG-12"
+  },
+  "BT-67": {
+   "id": "BT-67",
+   "label": "PLZ",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTaxRepresentativeTradeParty/ram:PostalTradeAddress/ram:PostcodeCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-12"
+  },
+  "BT-68": {
+   "id": "BT-68",
+   "label": "Bundesland",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTaxRepresentativeTradeParty/ram:PostalTradeAddress/ram:CountrySubDivisionName"
+    }
+   ],
+   "children": [],
+   "parent": "BG-12"
+  },
+  "BT-69": {
+   "id": "BT-69",
+   "label": "Ländercode",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTaxRepresentativeTradeParty/ram:PostalTradeAddress/ram:CountryID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-12"
+  },
+  "BG-13": {
+   "id": "BG-13",
+   "label": "DELIVERY INFORMATION",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction"
+    }
+   ],
+   "children": [
+    "BT-70",
+    "BT-71",
+    "BT-72",
+    "BG-14",
+    "BG-15"
+   ]
+  },
+  "BT-70": {
+   "id": "BT-70",
+   "label": "Name des Empfängers",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:Name"
+    }
+   ],
+   "children": [],
+   "parent": "BG-13"
+  },
+  "BT-71": {
+   "id": "BT-71",
+   "label": "Kennung des Lieferorts",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:ID"
+    },
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:GlobalID",
+     "when": [
+      {
+       "up": 0,
+       "attr": "schemeID",
+       "exists": true
+      }
+     ]
+    }
+   ],
+   "children": [],
+   "parent": "BG-13"
+  },
+  "BT-72": {
+   "id": "BT-72",
+   "label": "Lieferdatum",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ActualDeliverySupplyChainEvent/ram:OccurrenceDateTime/udt:DateTimeString"
+    }
+   ],
+   "children": [],
+   "parent": "BG-13"
+  },
+  "BG-14": {
+   "id": "BG-14",
+   "label": "INVOICING PERIOD",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:BillingSpecifiedPeriod"
+    }
+   ],
+   "children": [
+    "BT-73",
+    "BT-74"
+   ],
+   "parent": "BG-13"
+  },
+  "BT-73": {
+   "id": "BT-73",
+   "label": "Von",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:BillingSpecifiedPeriod/ram:StartDateTime/udt:DateTimeString"
+    }
+   ],
+   "children": [],
+   "parent": "BG-14"
+  },
+  "BT-74": {
+   "id": "BT-74",
+   "label": "Bis",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:BillingSpecifiedPeriod/ram:EndDateTime/udt:DateTimeString"
+    }
+   ],
+   "children": [],
+   "parent": "BG-14"
+  },
+  "BG-15": {
+   "id": "BG-15",
+   "label": "DELIVER TO ADDRESS",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:PostalTradeAddress"
+    }
+   ],
+   "children": [
+    "BT-75",
+    "BT-76",
+    "BT-165",
+    "BT-77",
+    "BT-78",
+    "BT-79",
+    "BT-80"
+   ],
+   "parent": "BG-13"
+  },
+  "BT-75": {
+   "id": "BT-75",
+   "label": "Adresszeile 1",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:PostalTradeAddress/ram:LineOne"
+    }
+   ],
+   "children": [],
+   "parent": "BG-15"
+  },
+  "BT-76": {
+   "id": "BT-76",
+   "label": "Adresszeile 2",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:PostalTradeAddress/ram:LineTwo"
+    }
+   ],
+   "children": [],
+   "parent": "BG-15"
+  },
+  "BT-165": {
+   "id": "BT-165",
+   "label": "Adresszeile 3",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:PostalTradeAddress/ram:LineThree"
+    }
+   ],
+   "children": [],
+   "parent": "BG-15"
+  },
+  "BT-77": {
+   "id": "BT-77",
+   "label": "Ort",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:PostalTradeAddress/ram:CityName"
+    }
+   ],
+   "children": [],
+   "parent": "BG-15"
+  },
+  "BT-78": {
+   "id": "BT-78",
+   "label": "PLZ",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:PostalTradeAddress/ram:PostcodeCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-15"
+  },
+  "BT-79": {
+   "id": "BT-79",
+   "label": "Bundesland",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:PostalTradeAddress/ram:CountrySubDivisionName"
+    }
+   ],
+   "children": [],
+   "parent": "BG-15"
+  },
+  "BT-80": {
+   "id": "BT-80",
+   "label": "Ländercode",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:PostalTradeAddress/ram:CountryID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-15"
+  },
+  "BG-16": {
+   "id": "BG-16",
+   "label": "PAYMENT INSTRUCTIONS",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans"
+    }
+   ],
+   "children": [
+    "BT-81",
+    "BT-82",
+    "BT-83",
+    "BG-17",
+    "BG-18",
+    "BG-19"
+   ]
+  },
+  "BT-81": {
+   "id": "BT-81",
+   "label": "Code für das Zahlungsmittel",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:TypeCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-16"
+  },
+  "BT-82": {
+   "id": "BT-82",
+   "label": "Zahlungsmittel",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:Information"
+    }
+   ],
+   "children": [],
+   "parent": "BG-16"
+  },
+  "BT-83": {
+   "id": "BT-83",
+   "label": "Verwendungszweck",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:PaymentReference"
+    }
+   ],
+   "children": [],
+   "parent": "BG-16"
+  },
+  "BG-17": {
+   "id": "BG-17",
+   "label": "BIC",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayeePartyCreditorFinancialAccount"
+    }
+   ],
+   "children": [
+    "BT-84",
+    "BT-85",
+    "BT-86"
+   ],
+   "parent": "BG-16"
+  },
+  "BT-84": {
+   "id": "BT-84",
+   "label": "IBAN",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayeePartyCreditorFinancialAccount/ram:ProprietaryID"
+    },
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayeePartyCreditorFinancialAccount/ram:IBANID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-17"
+  },
+  "BT-85": {
+   "id": "BT-85",
+   "label": "Kontoinhaber",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayeePartyCreditorFinancialAccount/ram:AccountName"
+    }
+   ],
+   "children": [],
+   "parent": "BG-17"
+  },
+  "BT-86": {
+   "id": "BT-86",
+   "label": "BIC",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayeeSpecifiedCreditorFinancialInstitution/ram:BICID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-17"
+  },
+  "BG-18": {
+   "id": "BG-18",
+   "label": "PAYMENT CARD INFORMATION",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:ApplicableTradeSettlementFinancialCard"
+    }
+   ],
+   "children": [
+    "BT-87",
+    "BT-88"
+   ],
+   "parent": "BG-16"
+  },
+  "BT-87": {
+   "id": "BT-87",
+   "label": "Kartennummer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:ApplicableTradeSettlementFinancialCard/ram:ID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-18"
+  },
+  "BT-88": {
+   "id": "BT-88",
+   "label": "Karteninhaber",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:ApplicableTradeSettlementFinancialCard/ram:CardholderName"
+    }
+   ],
+   "children": [],
+   "parent": "BG-18"
+  },
+  "BG-19": {
+   "id": "BG-19",
+   "label": "DIRECT DEBIT",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement"
+    }
+   ],
+   "children": [
+    "BT-89",
+    "BT-90",
+    "BT-91"
+   ],
+   "parent": "BG-16"
+  },
+  "BT-89": {
+   "id": "BT-89",
+   "label": "Mandatsreferenznr.",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradePaymentTerms/ram:DirectDebitMandateID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-19"
+  },
+  "BT-90": {
+   "id": "BT-90",
+   "label": "Gläubiger-ID",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:CreditorReferenceID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-19"
+  },
+  "BT-91": {
+   "id": "BT-91",
+   "label": "IBAN",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayerPartyDebtorFinancialAccount/ram:IBANID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-19"
+  },
+  "BG-20": {
+   "id": "BG-20",
+   "label": "DOCUMENT LEVEL ALLOWANCES",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge",
+     "when": [
+      {
+       "up": 0,
+       "child": "ram:ChargeIndicator/udt:Indicator",
+       "in": [
+        "false"
+       ]
+      }
+     ]
+    }
+   ],
+   "children": [
+    "BT-92",
+    "BT-93",
+    "BT-94",
+    "BT-95",
+    "BT-96",
+    "BT-97",
+    "BT-98"
+   ]
+  },
+  "BT-92": {
+   "id": "BT-92",
+   "label": "Nachlass",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:ActualAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-20"
+  },
+  "BT-93": {
+   "id": "BT-93",
+   "label": "Grundbetrag",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:BasisAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-20"
+  },
+  "BT-94": {
+   "id": "BT-94",
+   "label": "Prozentsatz",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:CalculationPercent"
+    }
+   ],
+   "children": [],
+   "parent": "BG-20"
+  },
+  "BT-95": {
+   "id": "BT-95",
+   "label": "Umsatzsteuerkategorie des\r\n    Nachlasses",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:CategoryTradeTax/ram:CategoryCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-20"
+  },
+  "BT-96": {
+   "id": "BT-96",
+   "label": "Umsatzsteuersatz des\r\n    Nachlasses",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:CategoryTradeTax/ram:RateApplicablePercent"
+    }
+   ],
+   "children": [],
+   "parent": "BG-20"
+  },
+  "BT-97": {
+   "id": "BT-97",
+   "label": "Grund für den Nachlass",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:Reason"
+    }
+   ],
+   "children": [],
+   "parent": "BG-20"
+  },
+  "BT-98": {
+   "id": "BT-98",
+   "label": "Kennung für den Nachlassgrund",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:ReasonCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-20"
+  },
+  "BG-21": {
+   "id": "BG-21",
+   "label": "DOCUMENT LEVEL CHARGES",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge",
+     "when": [
+      {
+       "up": 0,
+       "child": "ram:ChargeIndicator/udt:Indicator",
+       "in": [
+        "true"
+       ]
+      }
+     ]
+    }
+   ],
+   "children": [
+    "BT-99",
+    "BT-100",
+    "BT-101",
+    "BT-102",
+    "BT-103",
+    "BT-104",
+    "BT-105"
+   ]
+  },
+  "BT-99": {
+   "id": "BT-99",
+   "label": "Zuschlag",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:ActualAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-21"
+  },
+  "BT-100": {
+   "id": "BT-100",
+   "label": "Grundbetrag",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:BasisAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-21"
+  },
+  "BT-101": {
+   "id": "BT-101",
+   "label": "Prozentsatz",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:CalculationPercent"
+    }
+   ],
+   "children": [],
+   "parent": "BG-21"
+  },
+  "BT-102": {
+   "id": "BT-102",
+   "label": "Umsatzsteuerkategorie des\r\n    Zuschlages",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:CategoryTradeTax/ram:CategoryCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-21"
+  },
+  "BT-103": {
+   "id": "BT-103",
+   "label": "Umsatzsteuersatz des Zuschlages",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:CategoryTradeTax/ram:RateApplicablePercent"
+    }
+   ],
+   "children": [],
+   "parent": "BG-21"
+  },
+  "BT-104": {
+   "id": "BT-104",
+   "label": "Grund für den Zuschlag",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:Reason"
+    }
+   ],
+   "children": [],
+   "parent": "BG-21"
+  },
+  "BT-105": {
+   "id": "BT-105",
+   "label": "Kennung für den Zuschlagsgrund",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:ReasonCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-21"
+  },
+  "BG-22": {
+   "id": "BG-22",
+   "label": "DOCUMENT TOTALS",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation"
+    }
+   ],
+   "children": [
+    "BT-106",
+    "BT-107",
+    "BT-108",
+    "BT-109",
+    "BT-110",
+    "BT-111",
+    "BT-112",
+    "BT-113",
+    "BT-114",
+    "BT-115"
+   ]
+  },
+  "BT-106": {
+   "id": "BT-106",
+   "label": "Summe aller Positionen",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:LineTotalAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-22"
+  },
+  "BT-107": {
+   "id": "BT-107",
+   "label": "Summe Nachlässe",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:AllowanceTotalAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-22"
+  },
+  "BT-108": {
+   "id": "BT-108",
+   "label": "Summe Zuschläge",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:ChargeTotalAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-22"
+  },
+  "BT-109": {
+   "id": "BT-109",
+   "label": "Gesamtsumme",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TaxBasisTotalAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-22"
+  },
+  "BT-110": {
+   "id": "BT-110",
+   "label": "Summe Umsatzsteuer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TaxTotalAmount",
+     "when": [
+      {
+       "up": 0,
+       "attr": "currencyID",
+       "equalsHeader": "ram:InvoiceCurrencyCode"
+      }
+     ]
+    }
+   ],
+   "children": [],
+   "parent": "BG-22"
+  },
+  "BT-111": {
+   "id": "BT-111",
+   "label": "Summe Umsatzsteuer in Abrechnungswährung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TaxTotalAmount",
+     "when": [
+      {
+       "up": 0,
+       "attr": "currencyID",
+       "equalsHeader": "ram:TaxCurrencyCode"
+      }
+     ]
+    }
+   ],
+   "children": [],
+   "parent": "BG-22"
+  },
+  "BT-112": {
+   "id": "BT-112",
+   "label": "Gesamtsumme",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:GrandTotalAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-22"
+  },
+  "BT-113": {
+   "id": "BT-113",
+   "label": "Gezahlter Betrag",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TotalPrepaidAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-22"
+  },
+  "BT-114": {
+   "id": "BT-114",
+   "label": "Rundungsbetrag",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:RoundingAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-22"
+  },
+  "BT-115": {
+   "id": "BT-115",
+   "label": "Fälliger Betrag",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:DuePayableAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-22"
+  },
+  "BG-23": {
+   "id": "BG-23",
+   "label": "VAT BREAKDOWN",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax"
+    }
+   ],
+   "children": [
+    "BT-116",
+    "BT-117",
+    "BT-118",
+    "BT-119",
+    "BT-120",
+    "BT-121"
+   ]
+  },
+  "BT-116": {
+   "id": "BT-116",
+   "label": "Gesamtsumme",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:BasisAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-23"
+  },
+  "BT-117": {
+   "id": "BT-117",
+   "label": "Umsatzsteuerbetrag",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:CalculatedAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-23"
+  },
+  "BT-118": {
+   "id": "BT-118",
+   "label": "Umsatzsteuerkategorie",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:CategoryCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-23"
+  },
+  "BT-119": {
+   "id": "BT-119",
+   "label": "Umsatzsteuersatz",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:RateApplicablePercent"
+    }
+   ],
+   "children": [],
+   "parent": "BG-23"
+  },
+  "BT-120": {
+   "id": "BT-120",
+   "label": "Befreiungsgrund",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReason"
+    }
+   ],
+   "children": [],
+   "parent": "BG-23"
+  },
+  "BT-121": {
+   "id": "BT-121",
+   "label": "Kennung für den Befreiungsgrund",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReasonCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-23"
+  },
+  "BG-24": {
+   "id": "BG-24",
+   "label": "ADDITIONAL SUPPORTING DOCUMENTS",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:AdditionalReferencedDocument"
+    }
+   ],
+   "children": [
+    "BT-122",
+    "BT-123",
+    "BT-124",
+    "BT-125"
+   ]
+  },
+  "BT-122": {
+   "id": "BT-122",
+   "label": "Kennung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:AdditionalReferencedDocument/ram:IssuerAssignedID",
+     "when": [
+      {
+       "up": 1,
+       "child": "ram:TypeCode",
+       "in": [
+        "916"
+       ]
+      }
+     ]
+    }
+   ],
+   "children": [],
+   "parent": "BG-24"
+  },
+  "BT-123": {
+   "id": "BT-123",
+   "label": "Beschreibung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:AdditionalReferencedDocument/ram:Name"
+    }
+   ],
+   "children": [],
+   "parent": "BG-24"
+  },
+  "BT-124": {
+   "id": "BT-124",
+   "label": "Verweis (z.B. Internetadresse)",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:AdditionalReferencedDocument/ram:URIID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-24"
+  },
+  "BT-125": {
+   "id": "BT-125",
+   "label": "Anhangsdokument",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:AdditionalReferencedDocument/ram:AttachmentBinaryObject"
+    }
+   ],
+   "children": [],
+   "parent": "BG-24"
+  },
+  "BG-25": {
+   "id": "BG-25",
+   "label": "INVOICE LINE",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem"
+    }
+   ],
+   "children": [
+    "BT-126",
+    "BT-127",
+    "BT-128",
+    "BT-129",
+    "BT-130",
+    "BT-131",
+    "BT-132",
+    "BT-133",
+    "BG-26",
+    "BG-27",
+    "BG-28",
+    "BG-29",
+    "BG-30",
+    "BG-31"
+   ]
+  },
+  "BT-126": {
+   "id": "BT-126",
+   "label": "Position",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:AssociatedDocumentLineDocument/ram:LineID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-25"
+  },
+  "BT-127": {
+   "id": "BT-127",
+   "label": "Freitext",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:AssociatedDocumentLineDocument/ram:IncludedNote/ram:Content"
+    }
+   ],
+   "children": [],
+   "parent": "BG-25"
+  },
+  "BT-128": {
+   "id": "BT-128",
+   "label": "Objektkennung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:AdditionalReferencedDocument/ram:IssuerAssignedID",
+     "when": [
+      {
+       "up": 1,
+       "child": "ram:TypeCode",
+       "in": [
+        "130"
+       ]
+      }
+     ]
+    }
+   ],
+   "children": [],
+   "parent": "BG-25"
+  },
+  "BT-129": {
+   "id": "BT-129",
+   "label": "Menge",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeDelivery/ram:BilledQuantity"
+    }
+   ],
+   "children": [],
+   "parent": "BG-25"
+  },
+  "BT-130": {
+   "id": "BT-130",
+   "label": "Einheit",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeDelivery/ram:BilledQuantity/@unitCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-25"
+  },
+  "BT-131": {
+   "id": "BT-131",
+   "label": "Gesamtpreis (netto)",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeSettlementLineMonetarySummation/ram:LineTotalAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-25"
+  },
+  "BT-132": {
+   "id": "BT-132",
+   "label": "Nummer der Auftragsposition",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeAgreement/ram:BuyerOrderReferencedDocument/ram:LineID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-25"
+  },
+  "BT-133": {
+   "id": "BT-133",
+   "label": "Kontierungshinweis",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:ReceivableSpecifiedTradeAccountingAccount/ram:ID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-25"
+  },
+  "BG-26": {
+   "id": "BG-26",
+   "label": "INVOICE LINE PERIOD",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod"
+    }
+   ],
+   "children": [
+    "BT-134",
+    "BT-135"
+   ],
+   "parent": "BG-25"
+  },
+  "BT-134": {
+   "id": "BT-134",
+   "label": "Von",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod/ram:StartDateTime/udt:DateTimeString"
+    }
+   ],
+   "children": [],
+   "parent": "BG-26"
+  },
+  "BT-135": {
+   "id": "BT-135",
+   "label": "Bis",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod/ram:EndDateTime/udt:DateTimeString"
+    }
+   ],
+   "children": [],
+   "parent": "BG-26"
+  },
+  "BG-27": {
+   "id": "BG-27",
+   "label": "INVOICE LINE ALLOWANCES",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeAllowanceCharge",
+     "when": [
+      {
+       "up": 0,
+       "child": "ram:ChargeIndicator/udt:Indicator",
+       "in": [
+        "false"
+       ]
+      }
+     ]
+    }
+   ],
+   "children": [
+    "BT-136",
+    "BT-137",
+    "BT-138",
+    "BT-139",
+    "BT-140"
+   ],
+   "parent": "BG-25"
+  },
+  "BT-136": {
+   "id": "BT-136",
+   "label": "Nachlass (netto)",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:ActualAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-27"
+  },
+  "BT-137": {
+   "id": "BT-137",
+   "label": "Grundbetrag (netto)",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:BasisAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-27"
+  },
+  "BT-138": {
+   "id": "BT-138",
+   "label": "Prozentsatz",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:CalculationPercent"
+    }
+   ],
+   "children": [],
+   "parent": "BG-27"
+  },
+  "BT-139": {
+   "id": "BT-139",
+   "label": "Grund des Nachlasses",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:Reason"
+    }
+   ],
+   "children": [],
+   "parent": "BG-27"
+  },
+  "BT-140": {
+   "id": "BT-140",
+   "label": "Code für den Nachlassgrund",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:ReasonCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-27"
+  },
+  "BG-28": {
+   "id": "BG-28",
+   "label": "INVOICE LINE CHARGES",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeAllowanceCharge",
+     "when": [
+      {
+       "up": 0,
+       "child": "ram:ChargeIndicator/udt:Indicator",
+       "in": [
+        "true"
+       ]
+      }
+     ]
+    }
+   ],
+   "children": [
+    "BT-141",
+    "BT-142",
+    "BT-143",
+    "BT-144",
+    "BT-145"
+   ],
+   "parent": "BG-25"
+  },
+  "BT-141": {
+   "id": "BT-141",
+   "label": "Zuschlag (netto)",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:ActualAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-28"
+  },
+  "BT-142": {
+   "id": "BT-142",
+   "label": "Grundbetrag (netto)",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:BasisAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-28"
+  },
+  "BT-143": {
+   "id": "BT-143",
+   "label": "Prozentsatz",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:CalculationPercent"
+    }
+   ],
+   "children": [],
+   "parent": "BG-28"
+  },
+  "BT-144": {
+   "id": "BT-144",
+   "label": "Grund des Zuschlags",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:Reason"
+    }
+   ],
+   "children": [],
+   "parent": "BG-28"
+  },
+  "BT-145": {
+   "id": "BT-145",
+   "label": "Code für den Zuschlagsgrund",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:ReasonCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-28"
+  },
+  "BG-29": {
+   "id": "BG-29",
+   "label": "Basismenge zum Artikelpreis",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeAgreement"
+    }
+   ],
+   "children": [
+    "BT-146",
+    "BT-147",
+    "BT-148",
+    "BT-149",
+    "BT-150"
+   ],
+   "parent": "BG-25"
+  },
+  "BT-146": {
+   "id": "BT-146",
+   "label": "Preis pro Einheit (netto)",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:ChargeAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-29"
+  },
+  "BT-147": {
+   "id": "BT-147",
+   "label": "Rabatt (netto)",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:AppliedTradeAllowanceCharge/ram:ActualAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-29"
+  },
+  "BT-148": {
+   "id": "BT-148",
+   "label": "Listenpreis (netto)",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:ChargeAmount"
+    }
+   ],
+   "children": [],
+   "parent": "BG-29"
+  },
+  "BG-30": {
+   "id": "BG-30",
+   "label": "LINE VAT INFORMATION",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax"
+    }
+   ],
+   "children": [
+    "BT-151",
+    "BT-152"
+   ],
+   "parent": "BG-25"
+  },
+  "BT-151": {
+   "id": "BT-151",
+   "label": "Umsatzsteuer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:CategoryCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-30"
+  },
+  "BT-152": {
+   "id": "BT-152",
+   "label": "Umsatzsteuersatz",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:RateApplicablePercent"
+    }
+   ],
+   "children": [],
+   "parent": "BG-30"
+  },
+  "BG-31": {
+   "id": "BG-31",
+   "label": "ITEM INFORMATION",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct"
+    }
+   ],
+   "children": [
+    "BT-153",
+    "BT-154",
+    "BT-155",
+    "BT-156",
+    "BT-157",
+    "BT-158",
+    "BT-159",
+    "BG-32"
+   ],
+   "parent": "BG-25"
+  },
+  "BT-153": {
+   "id": "BT-153",
+   "label": "Bezeichnung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct/ram:Name"
+    }
+   ],
+   "children": [],
+   "parent": "BG-31"
+  },
+  "BT-154": {
+   "id": "BT-154",
+   "label": "Beschreibung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct/ram:Description"
+    }
+   ],
+   "children": [],
+   "parent": "BG-31"
+  },
+  "BT-155": {
+   "id": "BT-155",
+   "label": "Artikelnummer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct/ram:SellerAssignedID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-31"
+  },
+  "BT-156": {
+   "id": "BT-156",
+   "label": "Artikelkennung des Käufers",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct/ram:BuyerAssignedID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-31"
+  },
+  "BT-157": {
+   "id": "BT-157",
+   "label": "Artikelkennung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct/ram:GlobalID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-31"
+  },
+  "BT-158": {
+   "id": "BT-158",
+   "label": "Code der Artikelklassifizierung",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct/ram:DesignatedProductClassification/ram:ClassCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-31"
+  },
+  "BT-159": {
+   "id": "BT-159",
+   "label": "Code des Herkunftslandes",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct/ram:OriginTradeCountry/ram:ID"
+    }
+   ],
+   "children": [],
+   "parent": "BG-31"
+  },
+  "BG-32": {
+   "id": "BG-32",
+   "label": "ITEM ATTRIBUTES",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct/ram:ApplicableProductCharacteristic"
+    }
+   ],
+   "children": [
+    "BT-160",
+    "BT-161"
+   ],
+   "parent": "BG-31"
+  },
+  "BT-160": {
+   "id": "BT-160",
+   "label": "Item attribute name",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct/ram:ApplicableProductCharacteristic/ram:Description"
+    }
+   ],
+   "children": [],
+   "parent": "BG-32"
+  },
+  "BT-161": {
+   "id": "BT-161",
+   "label": "Item attribute value",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct/ram:ApplicableProductCharacteristic/ram:Value"
+    }
+   ],
+   "children": [],
+   "parent": "BG-32"
+  },
+  "BT-7": {
+   "id": "BT-7",
+   "label": "Abrechnungsdatum der Umsatzsteuer",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:TaxPointDate/udt:DateString"
+    }
+   ],
+   "children": []
+  },
+  "BT-149": {
+   "id": "BT-149",
+   "label": "Basismenge zum Artikelpreis",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:BasisQuantity | /rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:BasisQuantity"
+    }
+   ],
+   "children": [],
+   "parent": "BG-29"
+  },
+  "BT-150": {
+   "id": "BT-150",
+   "label": "Code der Maßeinheit",
+   "paths": [
+    {
+     "path": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:BasisQuantity/@unitCode | /rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:BasisQuantity/@unitCode"
+    }
+   ],
+   "children": [],
+   "parent": "BG-29"
+  }
+ }
+}

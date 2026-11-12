@@ -1,0 +1,16 @@
+services:
+  web:
+    build: .
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      VALIDATOR_URL: http://validator:8080
+    depends_on:
+      - validator
+    restart: unless-stopped
+
+  validator:
+    build: ./validator
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
