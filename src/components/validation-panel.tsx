@@ -132,7 +132,12 @@ export function ValidationPanel({ validation, onRetry, locate }: Props) {
         );
       })}
 
-      <p className="px-4 py-3 text-xs text-muted-foreground">Geprüft mit {report.validator}</p>
+      <div className="flex items-center justify-between gap-2 px-4 py-2 text-xs text-muted-foreground">
+        Geprüft mit {report.validator}
+        <Button variant="ghost" size="xs" onClick={onRetry}>
+          Erneut prüfen
+        </Button>
+      </div>
     </div>
   );
 }

@@ -64,7 +64,8 @@ export function findElement(doc: Document, steps: Step[]): Element | null {
 }
 
 export type Field = { el: Element; term?: Term; label: string; value: string };
-export type Group = { key: string; id: string; label: string; fields: Field[]; groups: Group[] };
+/** `el` is the XML element one instance of the group lives in (one line item, one VAT row …), if it has one. */
+export type Group = { key: string; id: string; label: string; el?: Element; fields: Field[]; groups: Group[] };
 export type Invoice = { root: Group; other: Field[]; currency: string | null };
 
 const DOCUMENT_TYPES: Record<string, string> = {
@@ -234,7 +235,7 @@ export function buildInvoice(doc: Document): Invoice {
       const key = `${group.key}/${id}:${instanceId}`;
       let child = groups.get(key);
       if (!child) {
-        child = { key, id, label: terms[id].label, fields: [], groups: [] };
+        child = { key, id, label: terms[id].label, el: instance ?? undefined, fields: [], groups: [] };
         groups.set(key, child);
         group.groups.push(child);
       }
@@ -246,4 +247,53 @@ export function buildInvoice(doc: Document): Invoice {
   const number = (f: Field) => (f.term ? Number(f.term.id.split("-")[1]) : Infinity);
   for (const group of [root, ...groups.values()]) group.fields.sort((a, b) => number(a) - number(b));
   return { root, other, currency };
+}
+
+export type Highlight = { fields: Set<Field>; groups: Set<string>; header: boolean };
+
+function flatten(group: Group, fields: Field[] = [], groups: Group[] = []) {
+  fields.push(...group.fields);
+  for (const child of group.groups) {
+    groups.push(child);
+    flatten(child, fields, groups);
+  }
+  return { fields, groups };
+}
+
+/**
+ * What to mark in the prepared view for a finding. `element` is where the validator located it,
+ * `termIds` the business terms it is about.
+ *   1. The fields of those terms, inside the located element where possible.
+ *   2. A term that is missing has no field, so its group is marked (BT-44 missing: "Käufer").
+ *   3. Without terms: the located field, or the group it sits in.
+ */
+export function highlightFor(invoice: Invoice, element: Element | null, termIds: string[]): Highlight | null {
+  const { fields, groups } = flatten(invoice.root);
+  fields.push(...invoice.other);
+  const inside = (el: Element | undefined) => !!el && !!element && (element === el || element.contains(el));
+  const result = (f: Field[], g: Group[] = [], header = false): Highlight => ({ fields: new Set(f), groups: new Set(g.map((group) => group.key)), header });
+
+  const ofTerms = fields.filter((field) => field.term && termIds.includes(field.term.id));
+  const ofTermsInside = ofTerms.filter((field) => inside(field.el));
+  if (ofTermsInside.length) return result(ofTermsInside);
+  if (ofTerms.length) return result(ofTerms);
+
+  for (const id of termIds) {
+    const groupId = isGroup(id) ? id : terms[id]?.parent;
+    // Invoice-level terms (BT-1 and friends) are shown in the block at the top.
+    if (!groupId) return terms[id] ? result([], [], true) : null;
+    for (let current: string | undefined = groupId; current; current = terms[current]?.parent) {
+      const candidates = groups.filter((group) => group.id === current);
+      const near = candidates.filter((group) => inside(group.el) || (!!group.el && !!element && group.el.contains(element)));
+      if (candidates.length) return result([], near.length ? near : candidates);
+    }
+  }
+
+  if (!element) return null;
+  const located = fields.filter((field) => inside(field.el));
+  // The whole document "contains" every field, which would mark everything.
+  if (located.length && located.length < fields.length) return result(located);
+  let deepest: Group | undefined;
+  for (const group of groups) if (group.el && (group.el === element || group.el.contains(element))) deepest = group;
+  return deepest ? result([], [deepest]) : null;
 }

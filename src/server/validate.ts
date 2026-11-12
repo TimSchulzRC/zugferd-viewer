@@ -1,9 +1,10 @@
 import { XMLParser } from "fast-xml-parser";
 import { z } from "zod";
-import { type Finding, type Report } from "@/lib/report";
+import { describeProfile, type Finding, type Report } from "@/lib/report";
 import { prefixFor, termsForFinding } from "@/lib/terms";
+import type { NodeStatus } from "./db";
+import { env } from "./env";
 
-const VALIDATOR_URL = process.env.VALIDATOR_URL ?? "http://localhost:8080";
 const SEVERITIES = ["error", "warning", "notice"] as const;
 
 const status = z.object({ "@status": z.enum(["valid", "invalid"]) });
@@ -70,38 +71,22 @@ function collect(node: unknown, part: Finding["part"], out: Finding[]) {
   }
 }
 
-export async function POST(request: Request) {
-  const form = await request.formData();
-  const file = form.get("file");
-  if (!(file instanceof File)) return Response.json({ error: "Keine Datei" }, { status: 400 });
+/** Sends the file to the Mustang service and turns its XML report into ours. Throws if the service fails. */
+export async function validate(bytes: Uint8Array, name: string): Promise<Report> {
+  const response = await fetch(`${env().VALIDATOR_URL}/validate`, {
+    method: "POST",
+    body: new Blob([bytes as Uint8Array<ArrayBuffer>]),
+    headers: { "X-Filename": encodeURIComponent(name) },
+  });
+  if (!response.ok) throw new Error(`Validator answered ${response.status}: ${await response.text()}`);
 
-  let xml: string;
-  try {
-    const response = await fetch(`${VALIDATOR_URL}/validate`, {
-      method: "POST",
-      body: await file.arrayBuffer(),
-      headers: { "X-Filename": encodeURIComponent(file.name) },
-    });
-    if (!response.ok) throw new Error(await response.text());
-    xml = await response.text();
-  } catch (error) {
-    console.error("Validator request failed", error);
-    return Response.json({ error: "Validator nicht erreichbar" }, { status: 502 });
-  }
-
-  const parsed = mustangReport.safeParse(parser.parse(xml));
-  if (!parsed.success) {
-    console.error("Unexpected validator report", parsed.error, xml.slice(0, 2000));
-    return Response.json({ error: "Unerwartete Antwort des Validators" }, { status: 502 });
-  }
-
-  const { validation } = parsed.data;
+  const { validation } = mustangReport.parse(parser.parse(await response.text()));
   const findings: Finding[] = [];
   collect(validation.pdf, "pdf", findings);
   collect(validation.xml, "xml", findings);
   collect(validation.messages, "file", findings);
 
-  const report: Report = {
+  return {
     valid: validation.summary["@status"] === "valid",
     pdf: validation.pdf?.summary["@status"] ?? null,
     xml: validation.xml?.summary?.["@status"] ?? null,
@@ -109,5 +94,9 @@ export async function POST(request: Request) {
     validator: `Mustang ${validation.xml?.info?.validator?.["@version"] ?? ""}`.trim(),
     findings,
   };
-  return Response.json(report);
+}
+
+export function statusOf(report: Report): NodeStatus {
+  if (!report.valid) return "invalid";
+  return describeProfile(report.profile)?.en16931 ? "einvoice" : "valid";
 }

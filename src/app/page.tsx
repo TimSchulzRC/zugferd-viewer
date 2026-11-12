@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { Viewer } from "@/components/viewer";
+import { App } from "@/components/app";
 
 export default function Page() {
   return (
     <Suspense>
-      <Viewer />
+      <App />
     </Suspense>
   );
 }

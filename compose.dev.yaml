@@ -1,0 +1,29 @@
+# Local development only: validator, Postgres and an S3 stand-in (S3Mock, forgets its files on restart), reachable on localhost.
+# Production uses compose.yaml, which has no S3 container and publishes no ports.
+name: zugferd-viewer-dev
+services:
+  validator:
+    build: ./validator
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: zugferd
+      POSTGRES_PASSWORD: zugferd
+      POSTGRES_DB: zugferd
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+
+  s3:
+    image: adobe/s3mock
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: zugferd
+    ports:
+      - "127.0.0.1:9000:9090"
+
+volumes:
+  postgres:

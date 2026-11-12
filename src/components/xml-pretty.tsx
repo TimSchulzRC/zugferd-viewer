@@ -1,8 +1,9 @@
 "use client";
 
 import { ChevronRight } from "lucide-react";
-import { Fragment, useMemo, useState } from "react";
-import { buildInvoice, type Field, type Group } from "@/lib/cii";
+import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { buildInvoice, highlightFor, type Field, type Group, type Highlight } from "@/lib/cii";
+import type { Finding } from "@/lib/report";
 import { cn } from "@/lib/utils";
 
 /** Top-level groups in the order an invoice is usually read. */
@@ -19,13 +20,23 @@ const PLURAL: Record<string, string> = {
   "BG-25": "Positionen",
 };
 
+const HighlightContext = createContext<Highlight | null>(null);
+const MARK = "bg-amber-400/25 outline-2 outline-amber-500/70";
+
+/** Whether the group or anything below it is marked, so a collapsed line item knows to open. */
+function containsHighlight(group: Group, highlight: Highlight | null): boolean {
+  if (!highlight) return false;
+  return highlight.groups.has(group.key) || group.fields.some((field) => highlight.fields.has(field)) || group.groups.some((child) => containsHighlight(child, highlight));
+}
+
 function Code({ children }: { children: string }) {
   return <span className="font-mono text-[10px] tracking-tight text-muted-foreground/80">{children}</span>;
 }
 
 function FieldView({ field }: { field: Field }) {
+  const marked = useContext(HighlightContext)?.fields.has(field);
   return (
-    <div className="min-w-0">
+    <div data-marked={marked || undefined} className={cn("min-w-0 rounded-sm", marked && cn(MARK, "outline-offset-4"))}>
       <dt className="flex items-baseline gap-1.5 text-xs text-muted-foreground">
         {field.label}
         {field.term && <Code>{field.term.id}</Code>}
@@ -47,11 +58,12 @@ function Fields({ fields }: { fields: Field[] }) {
 }
 
 function GroupBody({ group }: { group: Group }) {
+  const highlight = useContext(HighlightContext);
   return (
     <div className="space-y-4">
       <Fields fields={group.fields} />
       {group.groups.map((child) => (
-        <div key={child.key} className="space-y-2">
+        <div key={child.key} data-marked={highlight?.groups.has(child.key) || undefined} className={cn("space-y-2 rounded-sm", highlight?.groups.has(child.key) && cn(MARK, "outline-offset-4"))}>
           <h4 className="flex items-baseline gap-1.5 text-xs font-medium tracking-wide uppercase">
             {child.label} <Code>{child.id}</Code>
           </h4>
@@ -62,10 +74,10 @@ function GroupBody({ group }: { group: Group }) {
   );
 }
 
-function Section({ title, code, children }: { title: string; code?: string; children: React.ReactNode }) {
+function Section({ title, code, marked, children }: { title: string; code?: string; marked?: boolean; children: React.ReactNode }) {
   return (
     <section className="space-y-3 border-t pt-4">
-      <h3 className="flex items-baseline gap-2 font-heading text-base font-semibold">
+      <h3 data-marked={marked || undefined} className={cn("flex w-fit items-baseline gap-2 rounded-sm font-heading text-base font-semibold", marked && cn(MARK, "outline-offset-4"))}>
         {title} {code && <Code>{code}</Code>}
       </h3>
       {children}
@@ -102,6 +114,7 @@ const VAT_COLUMNS = [
 type Column = { id: string; label: string; numeric?: boolean };
 
 function Table({ columns, rows, expandable }: { columns: Column[]; rows: Group[]; expandable?: boolean }) {
+  const highlight = useContext(HighlightContext);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const toggle = (key: string) =>
     setOpen((current) => {
@@ -124,16 +137,21 @@ function Table({ columns, rows, expandable }: { columns: Column[]; rows: Group[]
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {rows.map((row) => {
+            const marked = containsHighlight(row, highlight);
+            // A marked line item opens itself so the marked field is visible.
+            const isOpen = expandable && (open.has(row.key) || marked);
+            return (
             <Fragment key={row.key}>
               <tr
-                className={cn("border-b align-top last:border-0", expandable && "cursor-pointer hover:bg-muted/50")}
+                data-marked={(marked && !expandable) || undefined}
+                className={cn("border-b align-top last:border-0", expandable && "cursor-pointer hover:bg-muted/50", marked && "bg-amber-400/25")}
                 onClick={expandable ? () => toggle(row.key) : undefined}
               >
                 {expandable && (
                   <td className="py-1.5">
-                    <button type="button" aria-expanded={open.has(row.key)} aria-label="Alle Angaben der Position" className="flex size-5 items-center justify-center rounded text-muted-foreground">
-                      <ChevronRight className={cn("size-4 transition-transform", open.has(row.key) && "rotate-90")} />
+                    <button type="button" aria-expanded={isOpen} aria-label="Alle Angaben der Position" className="flex size-5 items-center justify-center rounded text-muted-foreground">
+                      <ChevronRight className={cn("size-4 transition-transform", isOpen && "rotate-90")} />
                     </button>
                   </td>
                 )}
@@ -143,7 +161,7 @@ function Table({ columns, rows, expandable }: { columns: Column[]; rows: Group[]
                   </td>
                 ))}
               </tr>
-              {expandable && open.has(row.key) && (
+              {isOpen && (
                 <tr className="border-b bg-muted/30">
                   <td />
                   <td colSpan={columns.length} className="py-3 pr-3">
@@ -152,7 +170,8 @@ function Table({ columns, rows, expandable }: { columns: Column[]; rows: Group[]
                 </tr>
               )}
             </Fragment>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -160,10 +179,15 @@ function Table({ columns, rows, expandable }: { columns: Column[]; rows: Group[]
 }
 
 function Totals({ group }: { group: Group }) {
+  const highlight = useContext(HighlightContext);
   return (
     <dl className="ml-auto max-w-sm space-y-1 text-sm">
       {group.fields.map((field, i) => (
-        <div key={i} className={cn("flex items-baseline justify-between gap-4", field.term?.id === "BT-115" && "border-t pt-1 text-base font-semibold")}>
+        <div
+          key={i}
+          data-marked={highlight?.fields.has(field) || undefined}
+          className={cn("flex items-baseline justify-between gap-4 rounded-sm", field.term?.id === "BT-115" && "border-t pt-1 text-base font-semibold", highlight?.fields.has(field) && cn(MARK, "outline-offset-2"))}
+        >
           <dt className="flex items-baseline gap-1.5">
             {field.label} {field.term && <Code>{field.term.id}</Code>}
           </dt>
@@ -174,9 +198,17 @@ function Totals({ group }: { group: Group }) {
   );
 }
 
-export function XmlPretty({ doc }: { doc: Document }) {
+export type PrettyFocus = { finding: Finding; element: Element | null };
+
+export function XmlPretty({ doc, focus }: { doc: Document; focus: PrettyFocus | null }) {
   const invoice = useMemo(() => buildInvoice(doc), [doc]);
   const { root } = invoice;
+  const highlight = useMemo(() => (focus ? highlightFor(invoice, focus.element, focus.finding.terms) : null), [invoice, focus]);
+  const container = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (highlight) container.current?.querySelector("[data-marked]")?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [highlight]);
 
   const header = root.fields.filter((f) => !f.term || !PAYMENT_TERMS.has(f.term.id));
   const payment: Group = {
@@ -198,7 +230,8 @@ export function XmlPretty({ doc }: { doc: Document }) {
   const type = value(root, "BT-3").replace(/ \(\d+\)$/, "") || "Rechnung";
 
   return (
-    <div className="@container h-full overflow-auto">
+    <HighlightContext.Provider value={highlight}>
+    <div ref={container} className="@container h-full overflow-auto">
       <div className="mx-auto max-w-4xl space-y-5 p-5">
         <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <div>
@@ -208,14 +241,16 @@ export function XmlPretty({ doc }: { doc: Document }) {
           <p className="text-2xl font-semibold tabular-nums">{value(root, "BT-115")}</p>
         </header>
 
-        <Fields fields={header} />
+        <div data-marked={highlight?.header || undefined} className={cn("rounded-sm", highlight?.header && cn(MARK, "outline-offset-8"))}>
+          <Fields fields={header} />
+        </div>
 
         {ordered.map((id) => {
           const groups = sections.get(id)!;
           const title = groups.length > 1 || id === "BG-25" ? (PLURAL[id] ?? groups[0].label) : groups[0].label;
           const code = id.startsWith("BG-") ? id : undefined;
           return (
-            <Section key={id} title={title} code={code}>
+            <Section key={id} title={title} code={code} marked={id !== "BG-25" && id !== "BG-23" && groups.length === 1 && highlight?.groups.has(groups[0].key)}>
               {id === "BG-25" ? (
                 <Table columns={LINE_COLUMNS} rows={groups} expandable />
               ) : id === "BG-23" ? (
@@ -225,7 +260,9 @@ export function XmlPretty({ doc }: { doc: Document }) {
               ) : (
                 <div className="divide-y [&>*:not(:first-child)]:pt-4 [&>*:not(:last-child)]:pb-4">
                   {groups.map((group) => (
-                    <GroupBody key={group.key} group={group} />
+                    <div key={group.key} data-marked={(groups.length > 1 && highlight?.groups.has(group.key)) || undefined} className={cn("rounded-sm", groups.length > 1 && highlight?.groups.has(group.key) && cn(MARK, "outline-offset-4"))}>
+                      <GroupBody group={group} />
+                    </div>
                   ))}
                 </div>
               )}
@@ -240,5 +277,6 @@ export function XmlPretty({ doc }: { doc: Document }) {
         )}
       </div>
     </div>
+    </HighlightContext.Provider>
   );
 }
