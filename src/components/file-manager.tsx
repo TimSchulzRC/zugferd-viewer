@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { MoveDialog } from "@/components/move-dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Logo } from "@/components/logo";
 import { UserMenu } from "@/components/user-menu";
@@ -66,7 +67,6 @@ function RenameInput({ node, onDone }: { node: Node; onDone: (name: string | nul
       aria-label="Name"
       className="h-7 min-w-0 flex-1 rounded-md border border-ring bg-background px-1.5 text-sm outline-none ring-2 ring-ring/30"
       onClick={(event) => event.stopPropagation()}
-      onDoubleClick={(event) => event.stopPropagation()}
       onBlur={(event) => finish(event.target.value)}
       onKeyDown={(event) => {
         event.stopPropagation();
@@ -341,8 +341,8 @@ export function FileManager() {
                 data-row={node.id}
                 aria-selected={isSelected}
                 draggable={renaming !== node.id}
-                onClick={(event) => select(node, event)}
-                onDoubleClick={() => open(node)}
+                // A plain click opens; Ctrl, Cmd and Shift clicks select, as does the checkbox.
+                onClick={(event) => (event.shiftKey || event.metaKey || event.ctrlKey ? select(node, event) : open(node))}
                 onContextMenu={() => {
                   if (!isSelected) {
                     setSelected(new Set([node.id]));
@@ -358,12 +358,20 @@ export function FileManager() {
                 {...(node.kind === "folder" ? dropProps(node.id, key) : {})}
                 className={cn(
                   GRID,
-                  "h-10 cursor-default border-b text-sm select-none",
+                  "h-10 cursor-pointer border-b text-sm select-none",
                   isSelected ? "bg-primary/10" : "hover:bg-muted/50",
                   dropTarget === key && "bg-primary/10 ring-2 ring-primary ring-inset",
                 )}
               >
                 <div className="flex min-w-0 items-center gap-2.5">
+                  <Checkbox
+                    checked={isSelected}
+                    aria-label={`${node.name} auswählen`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      select(node, { shiftKey: event.shiftKey, metaKey: true, ctrlKey: false });
+                    }}
+                  />
                   {node.kind === "folder" ? <Folder className="size-4 shrink-0 fill-sky-500/20 text-sky-600" /> : <FileText className="size-4 shrink-0 text-muted-foreground" />}
                   {renaming === node.id ? (
                     <RenameInput
