@@ -1,5 +1,6 @@
 "use client";
 
+import { Logo } from "@/components/logo";
 import { useQuery } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
@@ -60,7 +61,9 @@ export function Login() {
   return (
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-6">
-        <h1 className="font-heading text-2xl font-semibold">ZUGFeRD Viewer</h1>
+        <h1 className="flex items-center gap-3 font-heading text-2xl font-semibold">
+          <Logo className="size-9 shrink-0" /> ZUGFeRD Viewer
+        </h1>
 
         {step === "email" ? (
           <form onSubmit={sendCode} className="space-y-3">

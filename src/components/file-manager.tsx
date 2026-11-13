@@ -9,6 +9,7 @@ import { MoveDialog } from "@/components/move-dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { Logo } from "@/components/logo";
 import { UserMenu } from "@/components/user-menu";
 import { api, download } from "@/lib/api";
 import type { Node } from "@/lib/nodes";
@@ -242,6 +243,7 @@ export function FileManager() {
 
       <header className="shrink-0 border-b">
         <div className="mx-auto flex h-12 w-full max-w-6xl items-center gap-2 px-3">
+        <Logo className="size-6 shrink-0" />
         <nav aria-label="Pfad" className="flex min-w-0 flex-1 items-center gap-0.5 text-sm">
           {crumbs.map((crumb, index) => {
             const last = index === crumbs.length - 1;
