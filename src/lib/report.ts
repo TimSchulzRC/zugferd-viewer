@@ -42,3 +42,34 @@ export function describeProfile(id: string | null): Profile | null {
   if (id.startsWith("urn:cen.eu:en16931:2017")) return { name: id.split("#").pop() ?? id, en16931: true };
   return { name: id, en16931: false };
 }
+
+export const RULESETS = ["zugferd", "xrechnung"] as const;
+export type Ruleset = (typeof RULESETS)[number];
+
+/** Rule ids of the XRechnung schematron: the German CIUS plus the Peppol rules it adopted. */
+const XRECHNUNG_RULE = /^(BR-DEX?|BR-TMP|PEPPOL-EN16931)-/;
+
+function isXRechnungNotice(finding: Finding) {
+  return finding.severity === "notice" && !!finding.rule && XRECHNUNG_RULE.test(finding.rule);
+}
+
+/**
+ * Mustang also runs the XRechnung rules over BASIC and EN 16931 files and reports what fails as a notice.
+ * Only for those profiles can the same report answer "would this pass as an XRechnung?".
+ */
+export function offersXRechnung(report: Report | null) {
+  const name = describeProfile(report?.profile ?? null)?.name;
+  return name === "BASIC" || name === "EN 16931";
+}
+
+/** The report as it reads for one ruleset: ZUGFeRD drops the XRechnung notices, XRechnung counts them as errors. */
+export function reportFor(report: Report, ruleset: Ruleset): Report {
+  if (!report.findings.some(isXRechnungNotice)) return report;
+  if (ruleset === "zugferd") return { ...report, findings: report.findings.filter((f) => !isXRechnungNotice(f)) };
+  return {
+    ...report,
+    valid: false,
+    xml: "invalid",
+    findings: report.findings.map((f) => (isXRechnungNotice(f) ? { ...f, severity: "error" } : f)),
+  };
+}

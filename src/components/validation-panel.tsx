@@ -2,7 +2,7 @@
 
 import { CircleAlert, CircleCheck, CircleX, Info, LoaderCircle, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { describeProfile, type Finding, type Report } from "@/lib/report";
+import { describeProfile, type Finding, type Report, type Ruleset } from "@/lib/report";
 import { describeTerm } from "@/lib/terms";
 import { cn } from "@/lib/utils";
 
@@ -57,12 +57,14 @@ function FindingRow({ finding, onLocate }: { finding: Finding; onLocate?: () => 
 
 type Props = {
   validation: Validation;
+  /** The rules the report was read for. The verdict names XRechnung when it is not ZUGFeRD. */
+  ruleset: Ruleset;
   onRetry: () => void;
   /** Returns a jump-to-XML action for findings that point at an element in the file. */
   locate: (finding: Finding) => (() => void) | undefined;
 };
 
-export function ValidationPanel({ validation, onRetry, locate }: Props) {
+export function ValidationPanel({ validation, ruleset, onRetry, locate }: Props) {
   if (validation.state === "loading") {
     return (
       <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -87,11 +89,18 @@ export function ValidationPanel({ validation, onRetry, locate }: Props) {
   const count = (severity: Finding["severity"]) => report.findings.filter((f) => f.severity === severity).length;
   const eInvoice = report.valid && !!profile?.en16931;
 
-  const verdict = eInvoice
-    ? { title: "Gültige E-Rechnung", tone: "bg-emerald-600/10 text-emerald-800 dark:text-emerald-300", icon: CircleCheck }
-    : report.valid
-      ? { title: "Gültig, aber keine E-Rechnung", tone: "bg-amber-500/15 text-amber-800 dark:text-amber-300", icon: TriangleAlert }
-      : { title: "Ungültig", tone: "bg-red-600/10 text-red-800 dark:text-red-300", icon: CircleX };
+  const good = "bg-emerald-600/10 text-emerald-800 dark:text-emerald-300";
+  const bad = "bg-red-600/10 text-red-800 dark:text-red-300";
+  const verdict =
+    ruleset === "xrechnung"
+      ? report.valid
+        ? { title: "Gültige XRechnung", tone: good, icon: CircleCheck }
+        : { title: "Keine gültige XRechnung", tone: bad, icon: CircleX }
+      : eInvoice
+        ? { title: "Gültige E-Rechnung", tone: good, icon: CircleCheck }
+        : report.valid
+          ? { title: "Gültig, aber keine E-Rechnung", tone: "bg-amber-500/15 text-amber-800 dark:text-amber-300", icon: TriangleAlert }
+          : { title: "Ungültig", tone: bad, icon: CircleX };
 
   return (
     <div className="h-full overflow-auto">

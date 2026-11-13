@@ -14,7 +14,7 @@ import { XmlRaw } from "@/components/xml-raw";
 import { api, download } from "@/lib/api";
 import { findElement, resolveTerm } from "@/lib/cii";
 import { openFile } from "@/lib/open-file";
-import { describeProfile, type Finding } from "@/lib/report";
+import { describeProfile, type Finding, offersXRechnung, reportFor, RULESETS } from "@/lib/report";
 import { parseLocation } from "@/lib/terms";
 import { cn } from "@/lib/utils";
 import { formatXml } from "@/lib/xml-format";
@@ -46,6 +46,7 @@ export function Viewer({ id }: { id: string }) {
     xml: parseAsBoolean.withDefault(true),
     check: parseAsBoolean.withDefault(true),
     view: parseAsStringLiteral(VIEWS).withDefault("aufbereitet"),
+    regeln: parseAsStringLiteral(RULESETS).withDefault("zugferd"),
     datei: parseAsString,
     ordner: parseAsString,
   });
@@ -70,7 +71,10 @@ export function Viewer({ id }: { id: string }) {
 
   const doc = opened.data?.doc ?? null;
   const formatted = useMemo(() => (doc ? formatXml(doc) : null), [doc]);
-  const report = details.data?.report ?? null;
+  const stored = details.data?.report ?? null;
+  const choosable = offersXRechnung(stored);
+  const ruleset = choosable ? query.regeln : "zugferd";
+  const report = useMemo(() => (stored ? reportFor(stored, ruleset) : null), [stored, ruleset]);
 
   const validation: Validation = recheck.isPending
     ? { state: "loading" }
@@ -184,9 +188,18 @@ export function Viewer({ id }: { id: string }) {
     ),
     check: (
       <div className="flex h-full flex-col">
-        <PanelHeader title="Prüfung" />
+        <PanelHeader title="Prüfung">
+          {choosable && (
+            <Tabs value={ruleset} onValueChange={(regeln) => setQuery({ regeln })}>
+              <TabsList className="h-7">
+                <TabsTrigger value="zugferd">ZUGFeRD</TabsTrigger>
+                <TabsTrigger value="xrechnung">XRechnung</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
+        </PanelHeader>
         <div className="min-h-0 flex-1">
-          <ValidationPanel validation={validation} onRetry={() => recheck.mutate()} locate={locate} />
+          <ValidationPanel validation={validation} ruleset={ruleset} onRetry={() => recheck.mutate()} locate={locate} />
         </div>
       </div>
     ),
