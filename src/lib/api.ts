@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { fileSchema, folderSchema, listingSchema, nodeSchema } from "./nodes";
+import { fileSchema, folderSchema, listingSchema, nodeSchema, shareInfoSchema, shareSchema, type FileDetails } from "./nodes";
 
 /**
  * Full page load on purpose: signing in or out must drop every cached query and re-run the
@@ -9,14 +9,24 @@ export function reload(path: string) {
   window.location.href = path;
 }
 
-async function request<T>(schema: z.ZodType<T>, url: string, init?: RequestInit): Promise<T> {
+/** An API error with its HTTP status, so the share page can tell "password needed" from other failures. */
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+async function request<T>(schema: z.ZodType<T>, url: string, init?: RequestInit, signedIn = true): Promise<T> {
   const response = await fetch(url, init);
-  if (response.status === 401) {
+  if (signedIn && response.status === 401) {
     reload("/login");
     throw new Error("Nicht angemeldet");
   }
   const json = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(json?.error ?? "Das hat nicht geklappt");
+  if (!response.ok) throw new ApiError(response.status, json?.error ?? "Das hat nicht geklappt");
   return schema.parse(json);
 }
 
@@ -35,6 +45,9 @@ export const api = {
   move: (ids: string[], parentId: string | null) => request(ok, "/api/nodes/bulk", json("POST", { action: "move", ids, parentId })),
   remove: (ids: string[]) => request(ok, "/api/nodes/bulk", json("POST", { action: "delete", ids })),
   revalidate: (id: string) => request(fileSchema, `/api/nodes/${id}/validate`, { method: "POST" }),
+  shares: (nodeId: string) => request(z.array(shareSchema), `/api/nodes/${nodeId}/shares`),
+  createShare: (nodeId: string, options: { password?: string; expiresOn?: string | null }) => request(shareSchema, `/api/nodes/${nodeId}/shares`, json("POST", options)),
+  deleteShare: (id: string) => request(ok, `/api/shares/${id}`, { method: "DELETE" }),
   invite: (email: string) => request(ok, "/api/users/invite", json("POST", { email })),
   upload: (parentId: string | null, file: File) => {
     const body = new FormData();
@@ -45,9 +58,54 @@ export const api = {
 };
 
 /** Starts a browser download: the file itself for one file, a zip for several or for folders. */
-export function download(ids: string[]) {
+export function download(ids: string[], base = "/api") {
   const link = document.createElement("a");
-  link.href = `/api/download?ids=${ids.join(",")}`;
+  link.href = `${base}/download?ids=${ids.join(",")}`;
   link.download = "";
   link.click();
+}
+
+/** Visitors of a public link use these instead of api; the server limits them to what the link covers. */
+export function shareApi(token: string) {
+  const base = `/api/s/${encodeURIComponent(token)}`;
+  return {
+    base,
+    info: () => request(shareInfoSchema, base, undefined, false),
+    unlock: (password: string) => request(ok, `${base}/unlock`, json("POST", { password }), false),
+    list: (parentId: string | null) => request(listingSchema, `${base}/nodes${parentId ? `?parent=${parentId}` : ""}`, undefined, false),
+    file: (id: string) => request(fileSchema, `${base}/nodes/${id}`, undefined, false),
+  };
+}
+
+/** The address of a public link, for copying. Built in the browser, so it matches the host people actually use. */
+export function shareUrl(token: string) {
+  return `${window.location.origin}/s/${token}`;
+}
+
+/** Where the viewer gets a file from: the signed-in API, or a public link. */
+export type Source = {
+  key: string;
+  file: (id: string) => Promise<FileDetails>;
+  contentUrl: (id: string) => string;
+  download: (ids: string[]) => void;
+  /** Only signed-in users can re-run the validator. */
+  revalidate?: (id: string) => Promise<FileDetails>;
+};
+
+export const ownSource: Source = {
+  key: "own",
+  file: api.file,
+  contentUrl: (id) => `/api/nodes/${id}/content`,
+  download: (ids) => download(ids),
+  revalidate: api.revalidate,
+};
+
+export function shareSource(token: string): Source {
+  const share = shareApi(token);
+  return {
+    key: `share:${token}`,
+    file: share.file,
+    contentUrl: (id) => `${share.base}/nodes/${id}/content`,
+    download: (ids) => download(ids, share.base),
+  };
 }

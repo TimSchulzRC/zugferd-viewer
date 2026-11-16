@@ -11,7 +11,7 @@ import { UserMenu } from "@/components/user-menu";
 import { ValidationPanel, type Validation } from "@/components/validation-panel";
 import { XmlPretty } from "@/components/xml-pretty";
 import { XmlRaw } from "@/components/xml-raw";
-import { api, download } from "@/lib/api";
+import { ownSource, type Source } from "@/lib/api";
 import { findElement, resolveTerm } from "@/lib/cii";
 import { openFile } from "@/lib/open-file";
 import { describeProfile, type Finding, offersXRechnung, reportFor, RULESETS } from "@/lib/report";
@@ -38,7 +38,15 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">{children}</div>;
 }
 
-export function Viewer({ id }: { id: string }) {
+type Props = {
+  id: string;
+  /** Where the file comes from. A public link passes its own source. */
+  source?: Source;
+  /** False for a link to a single file: there is no folder to go back to. */
+  canGoBack?: boolean;
+};
+
+export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
   const queryClient = useQueryClient();
   const [focus, setFocus] = useState<Focus | null>(null);
   const [query, setQuery] = useQueryStates({
@@ -51,15 +59,15 @@ export function Viewer({ id }: { id: string }) {
     ordner: parseAsString,
   });
 
-  const details = useQuery({ queryKey: ["file", id], queryFn: () => api.file(id) });
+  const details = useQuery({ queryKey: [source.key, "file", id], queryFn: () => source.file(id) });
   const name = details.data?.node.name;
   const opened = useQuery({
-    queryKey: ["content", id],
+    queryKey: [source.key, "content", id],
     enabled: !!name,
     staleTime: Infinity,
     gcTime: 0,
     queryFn: async () => {
-      const response = await fetch(`/api/nodes/${id}/content`);
+      const response = await fetch(source.contentUrl(id));
       if (!response.ok) throw new Error("Die Datei lässt sich nicht laden");
       return openFile(new File([await response.blob()], name!));
     },
@@ -67,7 +75,10 @@ export function Viewer({ id }: { id: string }) {
   const pdfUrl = opened.data?.pdfUrl;
   useEffect(() => () => void (pdfUrl && URL.revokeObjectURL(pdfUrl)), [pdfUrl]);
 
-  const recheck = useMutation({ mutationFn: () => api.revalidate(id), onSuccess: (data) => queryClient.setQueryData(["file", id], data) });
+  const recheck = useMutation({
+    mutationFn: () => (source.revalidate ? source.revalidate(id) : Promise.reject(new Error("Nicht verfügbar"))),
+    onSuccess: (data) => queryClient.setQueryData([source.key, "file", id], data),
+  });
 
   const doc = opened.data?.doc ?? null;
   const formatted = useMemo(() => (doc ? formatXml(doc) : null), [doc]);
@@ -199,7 +210,7 @@ export function Viewer({ id }: { id: string }) {
           )}
         </PanelHeader>
         <div className="min-h-0 flex-1">
-          <ValidationPanel validation={validation} ruleset={ruleset} onRetry={() => recheck.mutate()} locate={locate} />
+          <ValidationPanel validation={validation} ruleset={ruleset} onRetry={source.revalidate ? () => recheck.mutate() : undefined} locate={locate} />
         </div>
       </div>
     ),
@@ -209,9 +220,11 @@ export function Viewer({ id }: { id: string }) {
     <main className="flex h-dvh flex-col">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
         <div className="flex min-w-0 flex-1 items-center gap-1">
-          <Button variant="ghost" size="icon" aria-label="Zurück zum Ordner" onClick={back}>
-            <ArrowLeft />
-          </Button>
+          {canGoBack && (
+            <Button variant="ghost" size="icon" aria-label="Zurück zum Ordner" onClick={back}>
+              <ArrowLeft />
+            </Button>
+          )}
           <p className="truncate text-sm font-medium">{name}</p>
         </div>
         <div className="flex items-center gap-0.5 rounded-lg bg-muted p-[3px]" role="group" aria-label="Bereiche">
@@ -231,10 +244,10 @@ export function Viewer({ id }: { id: string }) {
           ))}
         </div>
         <div className="flex flex-1 items-center justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={() => download([id])}>
+          <Button variant="outline" size="sm" onClick={() => source.download([id])}>
             <Download /> Herunterladen
           </Button>
-          <UserMenu />
+          {source === ownSource && <UserMenu />}
         </div>
       </header>
       <ResizablePanelGroup key={shown.join("-")} orientation="horizontal" className="min-h-0 flex-1">

@@ -11,6 +11,8 @@ export const nodeSchema = z.object({
   size: z.number().nullable(),
   status: z.enum(["einvoice", "valid", "invalid"]).nullable(),
   updatedAt: z.string(),
+  /** Whether a public link that has not expired points at this node. */
+  shared: z.boolean().default(false),
 });
 export type Node = z.infer<typeof nodeSchema>;
 
@@ -35,3 +37,28 @@ export const nameSchema = z
 
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 export const ACCEPTED = /\.(pdf|xml)$/i;
+
+/** A public link as its creator sees it. */
+export const shareSchema = z.object({
+  id: z.string(),
+  token: z.string(),
+  hasPassword: z.boolean(),
+  /** Last day the link works, YYYY-MM-DD, or null for no end. */
+  expiresOn: z.string().nullable(),
+  expired: z.boolean(),
+  createdAt: z.string(),
+  createdBy: z.string().nullable(),
+});
+export type Share = z.infer<typeof shareSchema>;
+
+export const newShareSchema = z.object({
+  password: z.string().max(200).optional(),
+  expiresOn: z.iso.date("Kein gültiges Datum").nullable().optional(),
+});
+
+/** What a visitor of /s/<token> learns before and after entering the password. */
+export const shareInfoSchema = z.discriminatedUnion("locked", [
+  z.object({ locked: z.literal(true) }),
+  z.object({ locked: z.literal(false), kind: z.enum(["folder", "file"]), name: z.string(), rootId: z.string(), expiresOn: z.string().nullable() }),
+]);
+export type ShareInfo = z.infer<typeof shareInfoSchema>;

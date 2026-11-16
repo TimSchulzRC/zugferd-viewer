@@ -19,7 +19,20 @@ type NodeTable = {
   updated_at: Generated<Date>;
 };
 
-type Database = { node: NodeTable };
+type ShareTable = {
+  id: Generated<string>;
+  token: string;
+  node_id: string;
+  password_hash: string | null;
+  expires_on: string | null;
+  created_by: string | null;
+  created_at: Generated<Date>;
+};
+
+/** Better Auth owns this table; the app only reads from it. */
+type UserTable = { id: string; email: string };
+
+type Database = { node: NodeTable; share: ShareTable; user: UserTable };
 
 const globals = globalThis as { zugferdPool?: Pool; zugferdDb?: Kysely<Database> };
 
@@ -55,4 +68,17 @@ export async function migrateAppTables() {
       on node (coalesce(parent_id, '00000000-0000-0000-0000-000000000000'::uuid), lower(name))
   `.execute(db());
   await sql`create index if not exists node_parent on node (parent_id)`.execute(db());
+  // Public links to a folder or file. Deleting the node deletes its links.
+  await sql`
+    create table if not exists share (
+      id uuid primary key default gen_random_uuid(),
+      token text not null unique,
+      node_id uuid not null references node(id) on delete cascade,
+      password_hash text,
+      expires_on date,
+      created_by text references "user"(id) on delete set null,
+      created_at timestamptz not null default now()
+    )
+  `.execute(db());
+  await sql`create index if not exists share_node on share (node_id)`.execute(db());
 }
