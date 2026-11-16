@@ -40,6 +40,8 @@ function create() {
       emailOTP({
         disableSignUp: true,
         expiresIn: 600,
+        // Encrypted with the app secret, so someone reading the database cannot sign in with a pending code.
+        storeOTP: "encrypted",
         async sendVerificationOTP({ email, otp, type }) {
           if (type !== "sign-in") return;
           // Not awaited: the response time must not reveal whether the address exists.

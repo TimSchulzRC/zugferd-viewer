@@ -5,7 +5,7 @@ import { db } from "./db";
 import { env } from "./env";
 import { HttpError } from "./http";
 import { sendShareCode, sendShareInvitation } from "./mail";
-import { children, content, details, find, pathTo, tree } from "./nodes";
+import { children, content, details, find, pathTo } from "./nodes";
 
 /*
  * A share gives one outside person read access to a folder or file. The link alone is not enough:
@@ -239,7 +239,27 @@ export async function sharedContent(share: Row, id: string) {
   return content(id);
 }
 
+/**
+ * What a download of these ids contains. The check that every id lies inside the share and the walk
+ * down from them run in one statement, so a folder moved out of the share meanwhile cannot bring in
+ * files from elsewhere.
+ */
 export async function sharedTree(share: Row, ids: string[]) {
-  for (const id of ids) await relativePath(share, id);
-  return tree(ids);
+  const { rows } = await sql<{ kind: "folder" | "file"; path: string; storage_key: string | null; updated_at: Date; start: string | null }>`
+    with recursive scope as (
+      select id from node where id = ${share.node_id}
+      union all
+      select n.id from node n join scope on n.parent_id = scope.id
+    ),
+    down as (
+      select id, kind, name::text as path, storage_key, updated_at, id as start from node
+        where id = any(${ids}::uuid[]) and id in (select id from scope)
+      union all
+      select n.id, n.kind, down.path || '/' || n.name, n.storage_key, n.updated_at, null from node n join down on n.parent_id = down.id
+    )
+    select kind, path, storage_key, updated_at, start from down order by path
+  `.execute(db());
+  const found = new Set(rows.flatMap((row) => (row.start ? [row.start] : [])));
+  if (ids.some((id) => !found.has(id))) throw new HttpError(404, "Nicht gefunden");
+  return rows.map(({ kind, path, storage_key, updated_at }) => ({ kind, path, storage_key, updated_at }));
 }

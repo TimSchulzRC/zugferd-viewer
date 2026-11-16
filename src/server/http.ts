@@ -22,12 +22,29 @@ function failure(error: unknown): Response {
   return Response.json({ error: "Das hat nicht geklappt" }, { status: 500 });
 }
 
+/**
+ * Browsers send Origin with every POST, PATCH and DELETE. One that names another host is a forged
+ * request from another site, even a sibling subdomain that SameSite cookies would let through.
+ */
+function checkOrigin(request: Request) {
+  if (request.method === "GET" || request.method === "HEAD") return;
+  const origin = request.headers.get("origin");
+  if (!origin) return;
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  let originHost: string | null = null;
+  try {
+    originHost = new URL(origin).host;
+  } catch {}
+  if (originHost !== host) throw new HttpError(403, "Anfrage von einer fremden Seite");
+}
+
 /** Wraps a route: schema is migrated, the caller is signed in, and errors become JSON the client can show. */
 export function route<Context = unknown>(handler: Handler<Context>, options: { admin?: boolean } = {}) {
   return async (request: Request, context: Context): Promise<Response> => {
     try {
       // Keeps `next build` from running GET routes ahead of time, when there is no configuration yet.
       await connection();
+      checkOrigin(request);
       await ready();
       const user = await currentUser();
       if (!user) throw new HttpError(401, "Nicht angemeldet");
@@ -45,6 +62,7 @@ export function publicRoute<Context = unknown>(handler: (request: Request, conte
   return async (request: Request, context: Context): Promise<Response> => {
     try {
       await connection();
+      checkOrigin(request);
       await ready();
       const result = await handler(request, context);
       return result instanceof Response ? result : Response.json(result, { headers: { "Cache-Control": "private, no-store" } });
