@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, KeyRound, Link2, Trash2 } from "lucide-react";
+import { Copy, Mail, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -47,22 +47,22 @@ function ShareRow({ share, onDelete }: { share: Share; onDelete: () => void }) {
   const url = shareUrl(share.token);
   const facts = [
     share.expired ? "abgelaufen" : share.expiresOn ? `gültig bis ${dayFormat.format(new Date(`${share.expiresOn}T00:00`))}` : "ohne Ablaufdatum",
-    share.hasPassword ? "mit Passwort" : "ohne Passwort",
-    share.createdBy && `von ${share.createdBy}`,
+    share.createdBy && `geteilt von ${share.createdBy}`,
   ].filter(Boolean);
 
   return (
     <li className={cn("flex items-center gap-2 rounded-lg border p-2", share.expired && "opacity-60")}>
-      {share.hasPassword ? <KeyRound className="size-4 shrink-0 text-muted-foreground" /> : <Link2 className="size-4 shrink-0 text-muted-foreground" />}
+      <Mail className="size-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
+        <p className="truncate font-medium">{share.email}</p>
+        <p className="truncate text-xs text-muted-foreground">{facts.join(" · ")}</p>
         <input
           readOnly
           value={url}
           aria-label="Link"
           onFocus={(event) => event.currentTarget.select()}
-          className="w-full truncate bg-transparent font-mono text-xs outline-none"
+          className="w-full truncate bg-transparent font-mono text-xs text-muted-foreground outline-none"
         />
-        <p className="truncate text-xs text-muted-foreground">{facts.join(" · ")}</p>
       </div>
       <Button variant="ghost" size="icon-sm" aria-label="Link kopieren" disabled={share.expired} onClick={() => copyLink(share)}>
         <Copy />
@@ -77,7 +77,7 @@ function ShareRow({ share, onDelete }: { share: Share; onDelete: () => void }) {
 export function ShareDialog({ node, onClose }: { node: Node; onClose: () => void }) {
   const queryClient = useQueryClient();
   const shares = useQuery({ queryKey: ["shares", node.id], queryFn: () => api.shares(node.id) });
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
   const [expiresOn, setExpiresOn] = useState("");
 
   const refresh = () => {
@@ -87,12 +87,12 @@ export function ShareDialog({ node, onClose }: { node: Node; onClose: () => void
   };
 
   const create = useMutation({
-    mutationFn: () => api.createShare(node.id, { password: password || undefined, expiresOn: expiresOn || null }),
+    mutationFn: () => api.createShare(node.id, { email, expiresOn: expiresOn || null }),
     onSuccess: (share) => {
       refresh();
-      setPassword("");
+      setEmail("");
       setExpiresOn("");
-      copyLink(share);
+      toast.success(`Link an ${share.email} geschickt`);
     },
     onError: (error) => toast.error(error.message),
   });
@@ -100,7 +100,7 @@ export function ShareDialog({ node, onClose }: { node: Node; onClose: () => void
     mutationFn: (id: string) => api.deleteShare(id),
     onSuccess: () => {
       refresh();
-      toast.success("Link gelöscht. Wer ihn hat, kommt nicht mehr an die Dateien.");
+      toast.success("Freigabe beendet. Der Link funktioniert nicht mehr.");
     },
     onError: (error) => toast.error(error.message),
   });
@@ -111,8 +111,8 @@ export function ShareDialog({ node, onClose }: { node: Node; onClose: () => void
         <DialogHeader>
           <DialogTitle>„{node.name}“ teilen</DialogTitle>
           <DialogDescription>
-            Wer den Link hat, kann {node.kind === "folder" ? "den Ordner mit allem darin" : "die Datei"} ansehen und herunterladen, auch ohne Konto. Ändern
-            oder löschen kann niemand etwas.
+            Die Person bekommt einen Link per E-Mail. Beim Öffnen schicken wir ihr einen Code an genau diese Adresse, ein weitergeleiteter Link nützt also
+            niemandem. Sie kann {node.kind === "folder" ? "den Ordner mit allem darin" : "die Datei"} ansehen und herunterladen, aber nichts ändern.
           </DialogDescription>
         </DialogHeader>
 
@@ -131,19 +131,19 @@ export function ShareDialog({ node, onClose }: { node: Node; onClose: () => void
             create.mutate();
           }}
         >
-          <p className="font-medium">Neuer Link</p>
+          <p className="font-medium">Mit einer Person teilen</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="share-password">Passwort (optional)</Label>
-              <Input id="share-password" value={password} autoComplete="off" onChange={(event) => setPassword(event.target.value)} />
+              <Label htmlFor="share-email">E-Mail-Adresse</Label>
+              <Input id="share-email" type="email" required value={email} autoComplete="off" onChange={(event) => setEmail(event.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="share-expires">Gültig bis (optional)</Label>
               <Input id="share-expires" type="date" min={today()} value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} />
             </div>
           </div>
-          <Button type="submit" disabled={create.isPending} className="self-end">
-            <Link2 /> Link erstellen und kopieren
+          <Button type="submit" disabled={!email || create.isPending} className="self-end">
+            <Mail /> Teilen und Link senden
           </Button>
         </form>
       </DialogContent>

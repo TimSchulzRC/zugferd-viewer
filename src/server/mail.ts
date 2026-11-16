@@ -47,3 +47,26 @@ export function sendInvitation(to: string, inviter: string) {
     link: { label: "Anmelden", url },
   });
 }
+
+const dayFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "long", timeZone: "UTC" });
+
+export function sendShareInvitation(to: string, share: { inviter: string; name: string; url: string; expiresOn: string | null }) {
+  const until = share.expiresOn ? ` Der Link gilt bis ${dayFormat.format(new Date(`${share.expiresOn}T00:00Z`))}.` : "";
+  return send({
+    to,
+    subject: `${share.inviter} hat „${share.name}“ mit dir geteilt`,
+    heading: `„${share.name}“ wurde mit dir geteilt`,
+    body: `${share.inviter} hat dir Rechnungen zum Ansehen und Herunterladen freigegeben. Beim Öffnen schicken wir dir einen Code an diese Adresse. Der Link funktioniert nur für dich.${until}`,
+    link: { label: "Öffnen", url: share.url },
+  });
+}
+
+export function sendShareCode(to: string, code: string) {
+  return send({
+    to,
+    subject: `${code} ist dein Code für die geteilten Rechnungen`,
+    heading: "Dein Code",
+    body: "Gib diesen Code auf der Seite mit den geteilten Rechnungen ein. Er gilt 10 Minuten. Wenn du keinen Code angefordert hast, kannst du diese E-Mail ignorieren.",
+    code,
+  });
+}

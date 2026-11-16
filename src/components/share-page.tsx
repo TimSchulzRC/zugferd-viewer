@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Download, FileText, Folder, KeyRound, LoaderCircle } from "lucide-react";
+import { ChevronRight, Download, FileText, Folder, KeyRound, LoaderCircle, Mail } from "lucide-react";
 import { useParams } from "next/navigation";
 import { parseAsString, useQueryStates } from "nuqs";
 import { useMemo, useState } from "react";
@@ -26,18 +26,38 @@ function Centered({ children }: { children: React.ReactNode }) {
   );
 }
 
-function PasswordForm({ token }: { token: string }) {
+function CodeForm({ token, email }: { token: string; email: string }) {
   const queryClient = useQueryClient();
-  const [password, setPassword] = useState("");
+  const share = shareApi(token);
+  const [code, setCode] = useState("");
+  const send = useMutation({ mutationFn: share.requestCode });
   const unlock = useMutation({
-    mutationFn: () => shareApi(token).unlock(password),
+    mutationFn: () => share.unlock(code),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["share", token] }),
   });
+
+  if (!send.isSuccess) {
+    return (
+      <Centered>
+        <div className="flex max-w-sm flex-col gap-1">
+          <h1 className="text-base font-medium">Rechnungen wurden mit dir geteilt</h1>
+          <p className="text-muted-foreground">
+            Damit nur du sie siehst, schicken wir dir einen Code an <span className="font-medium text-foreground">{email}</span>.
+          </p>
+        </div>
+        <Button onClick={() => send.mutate()} disabled={send.isPending}>
+          <Mail /> Code senden
+        </Button>
+        {send.isError && <p className="text-destructive">{send.error.message}</p>}
+      </Centered>
+    );
+  }
+
   return (
     <Centered>
-      <div className="flex flex-col gap-1">
-        <h1 className="text-base font-medium">Diese Freigabe ist geschützt</h1>
-        <p className="text-muted-foreground">Bitte das Passwort eingeben, das du mit dem Link bekommen hast.</p>
+      <div className="flex max-w-sm flex-col gap-1">
+        <h1 className="text-base font-medium">Code eingeben</h1>
+        <p className="text-muted-foreground">Wir haben dir einen Code an {email} geschickt. Er gilt 10 Minuten.</p>
       </div>
       <form
         className="flex w-full max-w-xs flex-col gap-2"
@@ -46,10 +66,34 @@ function PasswordForm({ token }: { token: string }) {
           unlock.mutate();
         }}
       >
-        <Input type="password" autoFocus aria-label="Passwort" placeholder="Passwort" value={password} aria-invalid={unlock.isError || undefined} onChange={(event) => setPassword(event.target.value)} />
+        <Input
+          autoFocus
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          aria-label="Code"
+          placeholder="123456"
+          maxLength={6}
+          value={code}
+          aria-invalid={unlock.isError || undefined}
+          onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
+          className="text-center font-mono tracking-[0.4em]"
+        />
         {unlock.isError && <p className="text-left text-destructive">{unlock.error.message}</p>}
-        <Button type="submit" disabled={!password || unlock.isPending}>
+        <Button type="submit" disabled={code.length !== 6 || unlock.isPending}>
           <KeyRound /> Öffnen
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={send.isPending}
+          onClick={() => {
+            setCode("");
+            unlock.reset();
+            send.mutate();
+          }}
+        >
+          Neuen Code senden
         </Button>
       </form>
     </Centered>
@@ -149,7 +193,7 @@ function SharedFolder({ token, name, rootId, expiresOn }: { token: string; name:
   );
 }
 
-/** What someone without an account sees under /s/<token>: a password prompt, a read-only folder, or the viewer. */
+/** What someone without an account sees under /s/<token>: the code check, a read-only folder, or the viewer. */
 export function SharePage() {
   const { token } = useParams<{ token: string }>();
   const [{ datei }] = useQueryStates({ datei: parseAsString });
@@ -171,7 +215,7 @@ export function SharePage() {
     );
   }
   const data = info.data;
-  if (data.locked) return <PasswordForm token={token} />;
+  if (data.locked) return <CodeForm token={token} email={data.email} />;
   if (data.kind === "file") return <Viewer id={data.rootId} source={shareSource(token)} canGoBack={false} />;
   if (datei) return <Viewer key={datei} id={datei} source={shareSource(token)} />;
   return <SharedFolder token={token} name={data.name} rootId={data.rootId} expiresOn={data.expiresOn} />;

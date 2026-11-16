@@ -38,11 +38,12 @@ export const nameSchema = z
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 export const ACCEPTED = /\.(pdf|xml)$/i;
 
-/** A public link as its creator sees it. */
+/** A link for one outside person, as the people inside see it. */
 export const shareSchema = z.object({
   id: z.string(),
   token: z.string(),
-  hasPassword: z.boolean(),
+  /** The only address that receives the access code. */
+  email: z.string(),
   /** Last day the link works, YYYY-MM-DD, or null for no end. */
   expiresOn: z.string().nullable(),
   expired: z.boolean(),
@@ -52,13 +53,14 @@ export const shareSchema = z.object({
 export type Share = z.infer<typeof shareSchema>;
 
 export const newShareSchema = z.object({
-  password: z.string().max(200).optional(),
+  email: z.email("Das ist keine E-Mail-Adresse").transform((email) => email.trim().toLowerCase()),
   expiresOn: z.iso.date("Kein gültiges Datum").nullable().optional(),
 });
 
-/** What a visitor of /s/<token> learns before and after entering the password. */
+/** What a visitor of /s/<token> learns before and after confirming the code. */
 export const shareInfoSchema = z.discriminatedUnion("locked", [
-  z.object({ locked: z.literal(true) }),
+  /** The recipient's address, shortened, so they know which mailbox to check. */
+  z.object({ locked: z.literal(true), email: z.string() }),
   z.object({ locked: z.literal(false), kind: z.enum(["folder", "file"]), name: z.string(), rootId: z.string(), expiresOn: z.string().nullable() }),
 ]);
 export type ShareInfo = z.infer<typeof shareInfoSchema>;

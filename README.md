@@ -7,6 +7,7 @@ Ablage und Prüfung für ZUGFeRD-, Factur-X- und XRechnung-Dateien (PDF oder XML
 - **Dateimanager.** Ordner in beliebiger Tiefe, Hochladen per Drag-and-drop (auch ganze Ordner), Umbenennen, Verschieben, Löschen, Mehrfachauswahl, Download einzeln oder als Zip. Rechtsklick öffnet das Kontextmenü.
 - **Viewer.** Links die PDF, daneben das eingebettete XML als aufbereitete Rechnung oder im Rohformat, rechts das Prüfergebnis mit den betroffenen BT-Codes. Ein Klick auf einen Befund markiert die Stelle im XML.
 - **Nutzer.** Anmeldung per E-Mail-Code oder Microsoft. Wer sich anmelden darf, bestimmen Administratoren per Einladung.
+- **Teilen.** Ordner oder einzelne Dateien für eine Person außerhalb freigeben, wahlweise mit Ablaufdatum. Siehe unten.
 
 ## Aufbau
 
@@ -56,7 +57,15 @@ pnpm dev
 
 Ohne `LETTERMINT_TOKEN` verschickt die App keine Mails, sondern schreibt sie ins Server-Log. Dort steht dann auch der Anmeldecode. S3Mock vergisst seine Dateien beim Neustart.
 
-## Prüfung
+## Teilen mit Externen
+
+Rechtsklick auf einen Ordner oder eine Datei, „Teilen“, E-Mail-Adresse eintragen. Die Person bekommt einen Link per Mail. Öffnet sie ihn, schickt die App einen sechsstelligen Code an genau diese Adresse; erst der Code schaltet den Link in diesem Browser für 24 Stunden frei. Ein weitergeleiteter Link nützt deshalb niemandem ohne Zugriff auf das Postfach.
+
+- Externe können ansehen (PDF, Rechnungsdaten, Prüfergebnis) und herunterladen. Ändern, verschieben, löschen, erneut prüfen oder weiter teilen können sie nichts; sie haben kein Konto und erreichen keine andere API als `/api/s/<token>`.
+- Ein Link sieht nur den freigegebenen Ordner und was darin liegt. Ein Link-Symbol in der Dateiliste zeigt, was geteilt ist, ein Klick darauf öffnet die Liste der Freigaben. Löschen beendet den Zugriff sofort.
+- Codes gelten 10 Minuten, einmal, mit höchstens 5 Versuchen; ein neuer Code geht frühestens nach einer Minute raus. Die Datenbank speichert Codes und Sitzungen nur als HMAC mit `BETTER_AUTH_SECRET`.
+- Was heruntergeladen ist, kann die Person natürlich weitergeben. Das verhindert keine Software.
+
 
 Die App prüft nicht selbst. Beim Hochladen schickt sie die Datei an [Mustang](https://www.mustangproject.org/), den Open-Source-Validator für ZUGFeRD, und speichert dessen Ergebnis. Mustang prüft
 

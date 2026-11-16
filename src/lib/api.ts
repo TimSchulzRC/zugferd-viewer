@@ -46,7 +46,7 @@ export const api = {
   remove: (ids: string[]) => request(ok, "/api/nodes/bulk", json("POST", { action: "delete", ids })),
   revalidate: (id: string) => request(fileSchema, `/api/nodes/${id}/validate`, { method: "POST" }),
   shares: (nodeId: string) => request(z.array(shareSchema), `/api/nodes/${nodeId}/shares`),
-  createShare: (nodeId: string, options: { password?: string; expiresOn?: string | null }) => request(shareSchema, `/api/nodes/${nodeId}/shares`, json("POST", options)),
+  createShare: (nodeId: string, options: { email: string; expiresOn?: string | null }) => request(shareSchema, `/api/nodes/${nodeId}/shares`, json("POST", options)),
   deleteShare: (id: string) => request(ok, `/api/shares/${id}`, { method: "DELETE" }),
   invite: (email: string) => request(ok, "/api/users/invite", json("POST", { email })),
   upload: (parentId: string | null, file: File) => {
@@ -71,7 +71,8 @@ export function shareApi(token: string) {
   return {
     base,
     info: () => request(shareInfoSchema, base, undefined, false),
-    unlock: (password: string) => request(ok, `${base}/unlock`, json("POST", { password }), false),
+    requestCode: () => request(ok, `${base}/code`, { method: "POST" }, false),
+    unlock: (code: string) => request(ok, `${base}/unlock`, json("POST", { code }), false),
     list: (parentId: string | null) => request(listingSchema, `${base}/nodes${parentId ? `?parent=${parentId}` : ""}`, undefined, false),
     file: (id: string) => request(fileSchema, `${base}/nodes/${id}`, undefined, false),
   };

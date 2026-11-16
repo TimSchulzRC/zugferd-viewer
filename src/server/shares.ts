@@ -1,15 +1,37 @@
-import { createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
-import { promisify } from "node:util";
+import { createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { sql } from "kysely";
 import type { Crumb, FileDetails, Listing, Share, ShareInfo } from "@/lib/nodes";
 import { db } from "./db";
 import { env } from "./env";
 import { HttpError } from "./http";
+import { sendShareCode, sendShareInvitation } from "./mail";
 import { children, content, details, find, pathTo, tree } from "./nodes";
 
-const hash = promisify(scrypt) as (password: string, salt: Buffer, length: number) => Promise<Buffer>;
+/*
+ * A share gives one outside person read access to a folder or file. The link alone is not enough:
+ * the visitor asks for a code, the app mails it to the address the share was made for, and only
+ * the code unlocks the link in that browser. A forwarded link is useless without that mailbox.
+ */
 
-type Row = { id: string; token: string; node_id: string; password_hash: string | null; expires_on: string | null; expired: boolean; created_at: Date; created_by: string | null };
+type Row = {
+  id: string;
+  token: string;
+  node_id: string;
+  email: string;
+  expires_on: string | null;
+  expired: boolean;
+  created_at: Date;
+  created_by: string | null;
+  code_hash: string | null;
+  code_sent_at: Date | null;
+  code_attempts: number;
+};
+
+const CODE_MINUTES = 10;
+const CODE_ATTEMPTS = 5;
+const RESEND_SECONDS = 60;
+/** How long a confirmed browser keeps access before it needs a new code. */
+const SESSION_HOURS = 24;
 
 /** Every query reads the date as text, because pg turns a date column into a Date at local midnight. */
 function shares() {
@@ -20,8 +42,11 @@ function shares() {
       "share.id",
       "share.token",
       "share.node_id",
-      "share.password_hash",
+      "share.email",
       "share.created_at",
+      "share.code_hash",
+      "share.code_sent_at",
+      "share.code_attempts",
       "user.email as created_by",
       sql<string | null>`to_char(share.expires_on, 'YYYY-MM-DD')`.as("expires_on"),
       sql<boolean>`coalesce(share.expires_on < current_date, false)`.as("expired"),
@@ -32,7 +57,7 @@ function toShare(row: Row): Share {
   return {
     id: row.id,
     token: row.token,
-    hasPassword: row.password_hash !== null,
+    email: row.email,
     expiresOn: row.expires_on,
     expired: row.expired,
     createdAt: row.created_at.toISOString(),
@@ -40,16 +65,18 @@ function toShare(row: Row): Share {
   };
 }
 
-async function hashPassword(password: string) {
-  const salt = randomBytes(16);
-  return `${salt.toString("hex")}:${(await hash(password, salt, 32)).toString("hex")}`;
+/** Keyed with the app secret, so a leaked database does not reveal codes or let anyone forge cookies. */
+function mac(purpose: string, ...parts: string[]) {
+  return createHmac("sha256", env().BETTER_AUTH_SECRET).update([purpose, ...parts].join("\n")).digest("base64url");
 }
 
-async function passwordMatches(password: string, stored: string) {
-  const [salt, expected] = stored.split(":");
-  const actual = await hash(password, Buffer.from(salt, "hex"), 32);
-  return timingSafeEqual(actual, Buffer.from(expected, "hex"));
+function same(a: string, b: string) {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
 }
+
+/* Inside the app */
 
 export async function sharesOf(nodeId: string): Promise<Share[]> {
   await find(nodeId);
@@ -57,26 +84,26 @@ export async function sharesOf(nodeId: string): Promise<Share[]> {
   return rows.map(toShare);
 }
 
-export async function createShare(nodeId: string, options: { password?: string; expiresOn?: string | null }, userId: string): Promise<Share> {
-  await find(nodeId);
+export async function createShare(nodeId: string, options: { email: string; expiresOn?: string | null }, user: { id: string; name: string; email: string }): Promise<Share> {
+  const node = await find(nodeId);
   if (options.expiresOn) {
     // Same clock as the expiry check in shares(), so a link is never born expired.
     const { rows } = await sql<{ past: boolean }>`select ${options.expiresOn}::date < current_date as past`.execute(db());
     if (rows[0].past) throw new HttpError(400, "Das Ablaufdatum liegt in der Vergangenheit");
   }
-  const password = options.password?.trim() ? options.password : null;
-  const { id } = await db()
+  const { id, token } = await db()
     .insertInto("share")
-    .values({
-      // 144 random bits: nobody guesses a link.
-      token: randomBytes(18).toString("base64url"),
-      node_id: nodeId,
-      password_hash: password ? await hashPassword(password) : null,
-      expires_on: options.expiresOn ?? null,
-      created_by: userId,
-    })
-    .returning("id")
+    // 144 random bits: nobody guesses a link.
+    .values({ token: randomBytes(18).toString("base64url"), node_id: nodeId, email: options.email, expires_on: options.expiresOn ?? null, created_by: user.id })
+    .returning(["id", "token"])
     .executeTakeFirstOrThrow();
+  const inviter = user.name && user.name !== user.email.split("@")[0] ? user.name : user.email;
+  await sendShareInvitation(options.email, { inviter, name: node.name, url: `${env().APP_URL}/s/${token}`, expiresOn: options.expiresOn ?? null }).catch(async (error) => {
+    console.error("Sending the share invitation failed", error);
+    // A link nobody was told about is clutter; the person sharing can try again.
+    await db().deleteFrom("share").where("id", "=", id).execute();
+    throw new HttpError(502, "Die E-Mail konnte nicht gesendet werden");
+  });
   return toShare((await shares().where("share.id", "=", id).executeTakeFirstOrThrow()) as Row);
 }
 
@@ -87,8 +114,6 @@ export async function deleteShare(id: string) {
 
 /* Visitors */
 
-const COOKIE_DAYS = 7;
-
 async function lookup(token: string): Promise<Row> {
   const row = await shares().where("share.token", "=", token).executeTakeFirst();
   // Unknown and expired links look the same, so nobody learns which tokens once existed.
@@ -96,60 +121,85 @@ async function lookup(token: string): Promise<Row> {
   return row as Row;
 }
 
-/** The cookie proves the visitor typed the current password. A new or removed password makes old cookies useless. */
 function cookieName(share: Row) {
   return `zugferd_share_${share.id}`;
 }
 
-function cookieValue(share: Row) {
-  return createHmac("sha256", env().BETTER_AUTH_SECRET).update(`share:${share.id}:${share.password_hash}`).digest("base64url");
+/** "max.mustermann@firma.de" becomes "m•••@firma.de". */
+function maskEmail(email: string) {
+  const [local, domain] = email.split("@");
+  return `${local.slice(0, 1)}•••@${domain}`;
+}
+
+/** The cookie says: this browser confirmed a code for this share and this address, until the time in it. */
+function sessionCookie(share: Row, until: number) {
+  return `${until}.${mac("share-session", share.id, share.email, String(until))}`;
 }
 
 function isUnlocked(share: Row, request: Request) {
-  if (!share.password_hash) return true;
+  const name = cookieName(share);
   const cookies = request.headers.get("cookie") ?? "";
-  const sent = cookies.split(/;\s*/).find((pair) => pair.startsWith(`${cookieName(share)}=`))?.slice(cookieName(share).length + 1);
+  const sent = cookies.split(/;\s*/).find((pair) => pair.startsWith(`${name}=`))?.slice(name.length + 1);
   if (!sent) return false;
-  const expected = Buffer.from(cookieValue(share));
-  const actual = Buffer.from(sent);
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
+  const until = Number(sent.split(".")[0]);
+  return Number.isSafeInteger(until) && until > Date.now() && same(sent, sessionCookie(share, until));
 }
 
-/** The share behind a token, if the visitor may see it. */
+/** The share behind a token, if this browser has confirmed a code for it. */
 export async function access(token: string, request: Request): Promise<Row> {
   const share = await lookup(token);
-  if (!isUnlocked(share, request)) throw new HttpError(403, "Passwort nötig");
+  if (!isUnlocked(share, request)) throw new HttpError(403, "Bitte zuerst den Code aus der E-Mail eingeben");
   return share;
 }
 
 export async function info(token: string, request: Request): Promise<ShareInfo> {
   const share = await lookup(token);
-  if (!isUnlocked(share, request)) return { locked: true };
+  if (!isUnlocked(share, request)) return { locked: true, email: maskEmail(share.email) };
   const node = await find(share.node_id);
   return { locked: false, kind: node.kind, name: node.name, rootId: node.id, expiresOn: share.expires_on };
 }
 
-/** Failed password attempts per link, so a weak password cannot be tried out quickly. Per process, which is enough for one container. */
-const attempts = new Map<string, { count: number; since: number }>();
-const MAX_ATTEMPTS = 10;
-const WINDOW_MS = 15 * 60 * 1000;
-
-/** Checks the password and returns the Set-Cookie header that unlocks the link. */
-export async function unlock(token: string, password: string): Promise<string> {
+/** Mails a fresh code to the share's address. The visitor never names the address, so the code cannot go anywhere else. */
+export async function requestCode(token: string) {
   const share = await lookup(token);
-  if (share.password_hash) {
-    const now = Date.now();
-    const record = attempts.get(share.id);
-    const current = record && now - record.since < WINDOW_MS ? record : { count: 0, since: now };
-    if (current.count >= MAX_ATTEMPTS) throw new HttpError(429, "Zu viele Versuche. Bitte in 15 Minuten noch einmal.");
-    if (!(await passwordMatches(password, share.password_hash))) {
-      attempts.set(share.id, { ...current, count: current.count + 1 });
-      throw new HttpError(403, "Falsches Passwort");
-    }
-    attempts.delete(share.id);
+  if (share.code_sent_at && Date.now() - share.code_sent_at.getTime() < RESEND_SECONDS * 1000) {
+    throw new HttpError(429, "Ein Code ist gerade unterwegs. Einen neuen gibt es nach einer Minute.");
   }
+  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  // A new code replaces the old one and resets the attempts.
+  await db()
+    .updateTable("share")
+    .set({ code_hash: mac("share-code", share.id, code), code_sent_at: new Date(), code_attempts: 0 })
+    .where("id", "=", share.id)
+    .execute();
+  await sendShareCode(share.email, code).catch((error) => {
+    console.error("Sending the share code failed", error);
+    throw new HttpError(502, "Die E-Mail konnte nicht gesendet werden");
+  });
+}
+
+/** Checks the code and returns the Set-Cookie header that unlocks the link in this browser. */
+export async function unlock(token: string, code: string): Promise<string> {
+  const share = await lookup(token);
+  const fresh = share.code_hash && share.code_sent_at && Date.now() - share.code_sent_at.getTime() < CODE_MINUTES * 60 * 1000;
+  if (!fresh || share.code_attempts >= CODE_ATTEMPTS) throw new HttpError(403, "Der Code ist abgelaufen. Bitte einen neuen anfordern.");
+
+  // Counted before comparing, in one statement, so parallel guesses cannot slip past the limit.
+  const counted = await db()
+    .updateTable("share")
+    .set((eb) => ({ code_attempts: eb("code_attempts", "+", 1) }))
+    .where("id", "=", share.id)
+    .where("code_hash", "=", share.code_hash)
+    .where("code_attempts", "<", CODE_ATTEMPTS)
+    .executeTakeFirst();
+  if (!counted.numUpdatedRows) throw new HttpError(403, "Der Code ist abgelaufen. Bitte einen neuen anfordern.");
+  if (!same(mac("share-code", share.id, code.trim()), share.code_hash!)) throw new HttpError(403, "Der Code stimmt nicht");
+
+  // A code works once.
+  await db().updateTable("share").set({ code_hash: null }).where("id", "=", share.id).execute();
+  const until = Date.now() + SESSION_HOURS * 3600 * 1000;
   const secure = env().APP_URL.startsWith("https:") ? "; Secure" : "";
-  return `${cookieName(share)}=${cookieValue(share)}; Path=/api/s/${token}; Max-Age=${COOKIE_DAYS * 86400}; HttpOnly; SameSite=Lax${secure}`;
+  return `${cookieName(share)}=${sessionCookie(share, until)}; Path=/api/s/${token}; Max-Age=${SESSION_HOURS * 3600}; HttpOnly; SameSite=Lax${secure}`;
 }
 
 /**

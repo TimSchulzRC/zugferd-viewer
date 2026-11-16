@@ -8,5 +8,5 @@ export const GET = route<Context>(async (_request, _user, { params }) => sharesO
 
 export const POST = route<Context>(async (request, user, { params }) => {
   const options = newShareSchema.parse(await request.json());
-  return createShare(idSchema.parse((await params).id), options, user.id);
+  return createShare(idSchema.parse((await params).id), options, user);
 });
