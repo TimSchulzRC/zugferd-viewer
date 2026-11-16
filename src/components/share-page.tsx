@@ -30,13 +30,15 @@ function CodeForm({ token, email }: { token: string; email: string }) {
   const queryClient = useQueryClient();
   const share = shareApi(token);
   const [code, setCode] = useState("");
-  const send = useMutation({ mutationFn: share.requestCode });
+  // Stays true after a failed resend, so the code already in the mailbox can still be entered.
+  const [sent, setSent] = useState(false);
+  const send = useMutation({ mutationFn: share.requestCode, onSuccess: () => setSent(true) });
   const unlock = useMutation({
     mutationFn: () => share.unlock(code),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["share", token] }),
   });
 
-  if (!send.isSuccess) {
+  if (!sent) {
     return (
       <Centered>
         <div className="flex max-w-sm flex-col gap-1">
@@ -79,6 +81,7 @@ function CodeForm({ token, email }: { token: string; email: string }) {
           className="text-center font-mono tracking-[0.4em]"
         />
         {unlock.isError && <p className="text-left text-destructive">{unlock.error.message}</p>}
+        {send.isError && <p className="text-left text-destructive">{send.error.message}</p>}
         <Button type="submit" disabled={code.length !== 6 || unlock.isPending}>
           <KeyRound /> Öffnen
         </Button>

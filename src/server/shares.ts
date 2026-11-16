@@ -162,16 +162,16 @@ export async function info(token: string, request: Request): Promise<ShareInfo> 
 /** Mails a fresh code to the share's address. The visitor never names the address, so the code cannot go anywhere else. */
 export async function requestCode(token: string) {
   const share = await lookup(token);
-  if (share.code_sent_at && Date.now() - share.code_sent_at.getTime() < RESEND_SECONDS * 1000) {
-    throw new HttpError(429, "Ein Code ist gerade unterwegs. Einen neuen gibt es nach einer Minute.");
-  }
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  // A new code replaces the old one and resets the attempts.
-  await db()
+  // A new code replaces the old one and resets the attempts. The time check sits in the update,
+  // so parallel requests cannot each send a code.
+  const { numUpdatedRows } = await db()
     .updateTable("share")
     .set({ code_hash: mac("share-code", share.id, code), code_sent_at: new Date(), code_attempts: 0 })
     .where("id", "=", share.id)
-    .execute();
+    .where((eb) => eb.or([eb("code_sent_at", "is", null), eb("code_sent_at", "<", sql<Date>`now() - make_interval(secs => ${RESEND_SECONDS})`)]))
+    .executeTakeFirst();
+  if (!numUpdatedRows) throw new HttpError(429, "Ein Code ist gerade unterwegs. Einen neuen gibt es nach einer Minute.");
   await sendShareCode(share.email, code).catch((error) => {
     console.error("Sending the share code failed", error);
     throw new HttpError(502, "Die E-Mail konnte nicht gesendet werden");
@@ -195,8 +195,9 @@ export async function unlock(token: string, code: string): Promise<string> {
   if (!counted.numUpdatedRows) throw new HttpError(403, "Der Code ist abgelaufen. Bitte einen neuen anfordern.");
   if (!same(mac("share-code", share.id, code.trim()), share.code_hash!)) throw new HttpError(403, "Der Code stimmt nicht");
 
-  // A code works once.
-  await db().updateTable("share").set({ code_hash: null }).where("id", "=", share.id).execute();
+  // A code works once: of two parallel requests with the right code, only the one that clears it gets in.
+  const used = await db().updateTable("share").set({ code_hash: null }).where("id", "=", share.id).where("code_hash", "=", share.code_hash).executeTakeFirst();
+  if (!used.numUpdatedRows) throw new HttpError(403, "Der Code ist abgelaufen. Bitte einen neuen anfordern.");
   const until = Date.now() + SESSION_HOURS * 3600 * 1000;
   const secure = env().APP_URL.startsWith("https:") ? "; Secure" : "";
   return `${cookieName(share)}=${sessionCookie(share, until)}; Path=/api/s/${token}; Max-Age=${SESSION_HOURS * 3600}; HttpOnly; SameSite=Lax${secure}`;
@@ -213,9 +214,9 @@ async function relativePath(share: Row, id: string): Promise<Crumb[]> {
   return path.slice(start + 1);
 }
 
-/** The shared node is the visitor's root, so it appears as null, like the root in the app. */
-function relativeParent(share: Row, parentId: string | null) {
-  return parentId === share.node_id ? null : parentId;
+/** The shared node is the visitor's root: it and its direct children show no parent, like the root in the app. */
+function relativeParent(share: Row, node: { id: string; parentId: string | null }) {
+  return node.id === share.node_id || node.parentId === share.node_id ? null : node.parentId;
 }
 
 export async function sharedList(share: Row, parentId: string | null): Promise<Listing> {
@@ -224,13 +225,13 @@ export async function sharedList(share: Row, parentId: string | null): Promise<L
   if ((await find(folderId)).kind !== "folder") throw new HttpError(400, "Kein Ordner");
   const items = await children(folderId);
   // Whether something inside is shared again is the owner's business.
-  return { path, items: items.map((node) => ({ ...node, parentId: relativeParent(share, node.parentId), shared: false })) };
+  return { path, items: items.map((node) => ({ ...node, parentId: relativeParent(share, node), shared: false })) };
 }
 
 export async function sharedDetails(share: Row, id: string): Promise<FileDetails> {
   const path = await relativePath(share, id);
   const file = await details(id);
-  return { ...file, path: path.slice(0, -1), node: { ...file.node, parentId: relativeParent(share, file.node.parentId), shared: false } };
+  return { ...file, path: path.slice(0, -1), node: { ...file.node, parentId: relativeParent(share, file.node), shared: false } };
 }
 
 export async function sharedContent(share: Row, id: string) {
