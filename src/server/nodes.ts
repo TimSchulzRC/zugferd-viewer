@@ -7,9 +7,9 @@ import { deleteObjects, getObject, putObject } from "./storage";
 import { statusOf, validate } from "./validate";
 
 const COLUMNS = ["id", "parent_id", "kind", "name", "size", "status", "updated_at"] as const;
-type Row = { id: string; parent_id: string | null; kind: "folder" | "file"; name: string; size: number | string | null; status: Node["status"]; updated_at: Date };
+type Row = { id: string; parent_id: string | null; kind: "folder" | "file"; name: string; size: number | string | null; status: Node["status"]; updated_at: Date; shared?: boolean };
 
-function toNode(row: Row): Node {
+export function toNode(row: Row): Node {
   return {
     id: row.id,
     parentId: row.parent_id,
@@ -18,10 +18,11 @@ function toNode(row: Row): Node {
     size: row.size === null ? null : Number(row.size),
     status: row.status,
     updatedAt: row.updated_at.toISOString(),
+    shared: row.shared ?? false,
   };
 }
 
-async function find(id: string) {
+export async function find(id: string) {
   const row = await db().selectFrom("node").selectAll().where("id", "=", id).executeTakeFirst();
   if (!row) throw new HttpError(404, "Nicht gefunden");
   return row;
@@ -33,7 +34,7 @@ async function requireFolder(id: string | null) {
 }
 
 /** The folders from the root down to the given node, the node itself last. */
-async function pathTo(id: string | null): Promise<Crumb[]> {
+export async function pathTo(id: string | null): Promise<Crumb[]> {
   if (id === null) return [];
   const { rows } = await sql<Crumb & { depth: number }>`
     with recursive up as (
@@ -46,11 +47,19 @@ async function pathTo(id: string | null): Promise<Crumb[]> {
   return rows.map(({ id, name }) => ({ id, name }));
 }
 
+/** The children of a folder (null for the root), each marked whether a live public link points at it. */
+export async function children(parentId: string | null): Promise<Node[]> {
+  const query = db()
+    .selectFrom("node")
+    .select(COLUMNS)
+    .select(sql<boolean>`exists (select 1 from share where share.node_id = node.id and (share.expires_on is null or share.expires_on >= current_date))`.as("shared"));
+  const rows = await (parentId === null ? query.where("parent_id", "is", null) : query.where("parent_id", "=", parentId)).execute();
+  return rows.map(toNode);
+}
+
 export async function list(parentId: string | null): Promise<Listing> {
   await requireFolder(parentId);
-  const query = db().selectFrom("node").select(COLUMNS);
-  const rows = await (parentId === null ? query.where("parent_id", "is", null) : query.where("parent_id", "=", parentId)).execute();
-  return { path: await pathTo(parentId), items: rows.map(toNode) };
+  return { path: await pathTo(parentId), items: await children(parentId) };
 }
 
 export async function folders(): Promise<Folder[]> {

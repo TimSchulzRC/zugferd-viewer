@@ -1,11 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, ChevronRight, CircleCheck, CircleX, Download, FileText, Folder, FolderInput, FolderPlus, PenLine, Trash2, TriangleAlert, Upload, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, CircleCheck, CircleX, Download, FileText, Folder, FolderInput, FolderPlus, Link2, PenLine, Share2, Trash2, TriangleAlert, Upload, X } from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { MoveDialog } from "@/components/move-dialog";
+import { ShareDialog } from "@/components/share-dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,15 +31,15 @@ const COLUMNS: { key: SortKey; label: string; className: string }[] = [
 ];
 const GRID = "grid grid-cols-[minmax(0,1fr)_9rem_5.5rem] @2xl:grid-cols-[minmax(0,1fr)_9rem_5.5rem_10rem] items-center gap-3 px-4";
 
-const STATUS = {
+export const STATUS = {
   einvoice: { label: "E-Rechnung", icon: CircleCheck, color: "text-emerald-600" },
   valid: { label: "Kein EN 16931", icon: TriangleAlert, color: "text-amber-600" },
   invalid: { label: "Ungültig", icon: CircleX, color: "text-red-600" },
 } as const;
 
-const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" });
+export const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" });
 
-function formatSize(bytes: number) {
+export function formatSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024)).toLocaleString("de-DE")} kB`;
   return `${(bytes / 1024 / 1024).toLocaleString("de-DE", { maximumFractionDigits: 1 })} MB`;
 }
@@ -88,6 +89,7 @@ export function FileManager() {
   const [sort, setSort] = useState<{ key: SortKey; descending: boolean }>({ key: "name", descending: false });
   const [deleting, setDeleting] = useState<Node[] | null>(null);
   const [moving, setMoving] = useState<Node[] | null>(null);
+  const [sharing, setSharing] = useState<Node | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -174,7 +176,7 @@ export function FileManager() {
 
   const onKeyDown = (event: KeyboardEvent) => {
     // Typing in a field, an open dialog or an open menu keeps its own keys.
-    if (renaming || deleting || moving || (event.target as HTMLElement).closest("input, textarea, [role=menu], [role=dialog], [role=alertdialog]")) return;
+    if (renaming || deleting || moving || sharing || (event.target as HTMLElement).closest("input, textarea, [role=menu], [role=dialog], [role=alertdialog]")) return;
     const single = selection.length === 1 ? selection[0] : null;
     if (event.key === "Enter" && single) open(single);
     else if (event.key === "F2" && single) setRenaming(single.id);
@@ -272,6 +274,11 @@ export function FileManager() {
         {selection.length > 0 ? (
           <>
             <span className="text-sm text-muted-foreground tabular-nums">{selection.length} ausgewählt</span>
+            {single && (
+              <Button variant="outline" size="sm" onClick={() => setSharing(single)}>
+                <Share2 /> Teilen
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => download(selection.map((node) => node.id))}>
               <Download /> Herunterladen
             </Button>
@@ -384,6 +391,20 @@ export function FileManager() {
                   ) : (
                     <span className="truncate">{node.name}</span>
                   )}
+                  {node.shared && (
+                    <button
+                      type="button"
+                      title="Per Link geteilt"
+                      aria-label={`Freigaben von ${node.name}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setSharing(node);
+                      }}
+                      className="shrink-0 rounded p-0.5 text-sky-600 hover:bg-muted"
+                    >
+                      <Link2 className="size-4" />
+                    </button>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5 whitespace-nowrap">
                   {status && (
@@ -436,6 +457,11 @@ export function FileManager() {
               <ContextMenuItem onClick={() => download(selection.map((node) => node.id))}>
                 <Download /> Herunterladen
               </ContextMenuItem>
+              {single && (
+                <ContextMenuItem onClick={() => setSharing(single)}>
+                  <Share2 /> Teilen
+                </ContextMenuItem>
+              )}
               <ContextMenuSeparator />
               {single && (
                 <ContextMenuItem onClick={() => setRenaming(single.id)}>
@@ -474,6 +500,8 @@ export function FileManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {sharing && <ShareDialog node={sharing} onClose={() => setSharing(null)} />}
 
       {moving && (
         <MoveDialog

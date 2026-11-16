@@ -59,7 +59,8 @@ type Props = {
   validation: Validation;
   /** The rules the report was read for. The verdict names XRechnung when it is not ZUGFeRD. */
   ruleset: Ruleset;
-  onRetry: () => void;
+  /** Left out where the visitor cannot re-run the validator (public links). */
+  onRetry?: () => void;
   /** Returns a jump-to-XML action for findings that point at an element in the file. */
   locate: (finding: Finding) => (() => void) | undefined;
 };
@@ -77,9 +78,11 @@ export function ValidationPanel({ validation, ruleset, onRetry, locate }: Props)
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm">
         <CircleAlert className="size-6 text-muted-foreground" />
         <p>{validation.message}</p>
-        <Button variant="outline" size="sm" onClick={onRetry}>
-          Erneut prüfen
-        </Button>
+        {onRetry && (
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            Erneut prüfen
+          </Button>
+        )}
       </div>
     );
   }
@@ -143,9 +146,11 @@ export function ValidationPanel({ validation, ruleset, onRetry, locate }: Props)
 
       <div className="flex items-center justify-between gap-2 px-4 py-2 text-xs text-muted-foreground">
         Geprüft mit {report.validator}
-        <Button variant="ghost" size="xs" onClick={onRetry}>
-          Erneut prüfen
-        </Button>
+        {onRetry && (
+          <Button variant="ghost" size="xs" onClick={onRetry}>
+            Erneut prüfen
+          </Button>
+        )}
       </div>
     </div>
   );
