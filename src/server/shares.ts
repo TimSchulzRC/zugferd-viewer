@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { sql } from "kysely";
+import { devCode } from "@/lib/dev";
 import type { Crumb, FileDetails, Listing, Share, ShareInfo } from "@/lib/nodes";
 import { db } from "./db";
 import { env } from "./env";
@@ -162,7 +163,7 @@ export async function info(token: string, request: Request): Promise<ShareInfo> 
 /** Mails a fresh code to the share's address. The visitor never names the address, so the code cannot go anywhere else. */
 export async function requestCode(token: string) {
   const share = await lookup(token);
-  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  const code = devCode(env().LETTERMINT_TOKEN) ?? String(randomInt(0, 1_000_000)).padStart(6, "0");
   // A new code replaces the old one and resets the attempts. The time check sits in the update,
   // so parallel requests cannot each send a code.
   const { numUpdatedRows } = await db()

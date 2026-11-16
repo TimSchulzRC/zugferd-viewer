@@ -5,6 +5,7 @@ import { admin, emailOTP } from "better-auth/plugins";
 import { headers } from "next/headers";
 import { migrateAppTables, pool } from "./db";
 import { env, microsoft } from "./env";
+import { devCode } from "@/lib/dev";
 import { sendLoginCode } from "./mail";
 import { checkBucket } from "./storage";
 
@@ -42,6 +43,7 @@ function create() {
         expiresIn: 600,
         // Encrypted with the app secret, so someone reading the database cannot sign in with a pending code.
         storeOTP: "encrypted",
+        generateOTP: () => devCode(env().LETTERMINT_TOKEN) ?? undefined,
         async sendVerificationOTP({ email, otp, type }) {
           if (type !== "sign-in") return;
           // Not awaited: the response time must not reveal whether the address exists.

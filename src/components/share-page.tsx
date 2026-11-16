@@ -5,6 +5,7 @@ import { ChevronRight, Download, FileText, Folder, KeyRound, LoaderCircle, Mail 
 import { useParams } from "next/navigation";
 import { parseAsString, useQueryStates } from "nuqs";
 import { useMemo, useState } from "react";
+import { DEV_CODE } from "@/lib/dev";
 import { dateFormat, formatSize, STATUS } from "@/components/file-manager";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
@@ -32,10 +33,20 @@ function CodeForm({ token, email }: { token: string; email: string }) {
   const [code, setCode] = useState("");
   // Stays true after a failed resend, so the code already in the mailbox can still be entered.
   const [sent, setSent] = useState(false);
-  const send = useMutation({ mutationFn: share.requestCode, onSuccess: () => setSent(true) });
   const unlock = useMutation({
-    mutationFn: () => share.unlock(code),
+    mutationFn: (value: string) => share.unlock(value),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["share", token] }),
+  });
+
+  const send = useMutation({
+    mutationFn: share.requestCode,
+    onSuccess: () => {
+      setSent(true);
+      if (DEV_CODE) {
+        setCode(DEV_CODE);
+        unlock.mutate(DEV_CODE);
+      }
+    },
   });
 
   if (!sent) {
@@ -65,7 +76,7 @@ function CodeForm({ token, email }: { token: string; email: string }) {
         className="flex w-full max-w-xs flex-col gap-2"
         onSubmit={(event) => {
           event.preventDefault();
-          unlock.mutate();
+          unlock.mutate(code);
         }}
       >
         <Input

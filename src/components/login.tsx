@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
 import { useState } from "react";
+import { DEV_CODE } from "@/lib/dev";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
@@ -40,8 +41,9 @@ export function Login() {
     const result = await authClient.emailOtp.sendVerificationOtp({ email: email.trim(), type: "sign-in" });
     setBusy(false);
     if (result.error) return setError("Der Code konnte nicht gesendet werden.");
-    setCode("");
+    setCode(DEV_CODE ?? "");
     setStep("code");
+    if (DEV_CODE) signIn(DEV_CODE);
   };
 
   const signIn = async (otp: string) => {
