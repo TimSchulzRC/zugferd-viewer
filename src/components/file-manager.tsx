@@ -33,7 +33,8 @@ const COLUMNS: { key: SortKey; label: string; className: string }[] = [
   { key: "size", label: "Größe", className: "justify-end text-right" },
   { key: "updatedAt", label: "Geändert", className: "hidden @2xl:flex" },
 ];
-const GRID = "grid grid-cols-[minmax(0,1fr)_9rem_5.5rem] @2xl:grid-cols-[minmax(0,1fr)_9rem_5.5rem_10rem] items-center gap-3 px-4";
+// The last column holds the sharing button.
+const GRID = "grid grid-cols-[minmax(0,1fr)_9rem_5.5rem_1.5rem] @2xl:grid-cols-[minmax(0,1fr)_9rem_5.5rem_10rem_1.5rem] items-center gap-3 px-4";
 
 export const STATUS = {
   einvoice: { label: "E-Rechnung", icon: CircleCheck, color: "text-emerald-600" },
@@ -448,6 +449,7 @@ export function FileManager() {
                 </div>
               );
             })}
+            <span className="sr-only">Freigabe</span>
           </div>
 
           {items.map((node) => {
@@ -510,27 +512,6 @@ export function FileManager() {
                     <span className="truncate">{node.name}</span>
                   )}
                   </div>
-                  {node.shared && (
-                    <button
-                      type="button"
-                      title="Geteilt"
-                      aria-label={`Freigaben von ${node.name}`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setSharing(node);
-                      }}
-                      className="shrink-0 rounded p-0.5 text-sky-600 hover:bg-muted"
-                    >
-                      <Users className="size-4" />
-                    </button>
-                  )}
-                  {ordner === null && node.owner && (
-                    <span className="flex min-w-0 shrink items-center gap-1 text-xs text-muted-foreground" title={`Geteilt von ${node.owner}${node.access === "view" ? ", nur ansehen" : ""}`}>
-                      <Users className="size-3.5 shrink-0" />
-                      <span className="truncate">{node.owner}</span>
-                      {node.access === "view" && <Eye className="size-3.5 shrink-0" />}
-                    </span>
-                  )}
                 </div>
                 <div className="flex items-center gap-1.5 whitespace-nowrap">
                   {status && (
@@ -542,6 +523,32 @@ export function FileManager() {
                 </div>
                 <div className="text-right text-muted-foreground tabular-nums">{node.size !== null && formatSize(node.size)}</div>
                 <div className="hidden whitespace-nowrap text-muted-foreground @2xl:block">{dateFormat.format(new Date(node.updatedAt))}</div>
+                <div className="flex justify-end">
+                  {node.shared && (
+                    <button
+                      type="button"
+                      title="Geteilt"
+                      aria-label={`Freigaben von ${node.name}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setSharing(node);
+                      }}
+                      className="rounded p-0.5 text-sky-600 hover:bg-muted"
+                    >
+                      <Users className="size-4" />
+                    </button>
+                  )}
+                  {ordner === null && node.owner && (
+                    <span
+                      role="img"
+                      title={`Geteilt von ${node.owner}${node.access === "view" ? ", nur ansehen" : ""}`}
+                      aria-label={`Geteilt von ${node.owner}${node.access === "view" ? ", nur ansehen" : ""}`}
+                      className="p-0.5 text-muted-foreground"
+                    >
+                      <Users className="size-4" />
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}
