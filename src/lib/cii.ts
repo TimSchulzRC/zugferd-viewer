@@ -297,3 +297,14 @@ export function highlightFor(invoice: Invoice, element: Element | null, termIds:
   for (const group of groups) if (group.el && (group.el === element || group.el.contains(element))) deepest = group;
   return deepest ? result([], [deepest]) : null;
 }
+
+/** The XML elements a highlight covers, so the raw view can scroll to the spot the prettified view marks. */
+export function highlightedElements(invoice: Invoice, highlight: Highlight): Element[] {
+  const { fields, groups } = flatten(invoice.root);
+  fields.push(...invoice.other);
+  return [
+    ...fields.filter((field) => highlight.fields.has(field)).map((field) => field.el),
+    ...groups.flatMap((group) => (highlight.groups.has(group.key) && group.el ? [group.el] : [])),
+    ...(highlight.header ? invoice.root.fields.map((field) => field.el) : []),
+  ];
+}
