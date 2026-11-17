@@ -48,7 +48,8 @@ export function formatSize(bytes: number) {
 }
 
 export function FileManager() {
-  const [{ ordner }, setQuery] = useQueryStates({ ordner: parseAsString, datei: parseAsString });
+  // Every folder and file opened is a history entry, so the browser's back button retraces the steps.
+  const [{ ordner }, setQuery] = useQueryStates({ ordner: parseAsString, datei: parseAsString }, { history: "push" });
   const queryClient = useQueryClient();
   const listing = useQuery({ queryKey: ["nodes", ordner], queryFn: () => api.list(ordner) });
 

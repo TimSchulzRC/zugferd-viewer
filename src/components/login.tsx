@@ -4,7 +4,7 @@ import { Logo } from "@/components/logo";
 import { useQuery } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DEV_CODE } from "@/lib/dev";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,11 @@ export function Login() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(query.error ? "Dieses Microsoft-Konto ist nicht eingeladen." : null);
+  // Someone already signed in who lands here (an old tab, a bookmark) goes straight to the files.
+  const session = authClient.useSession();
+  useEffect(() => {
+    if (session.data) reload("/");
+  }, [session.data]);
   const config = useQuery({ queryKey: ["config"], queryFn: () => fetch("/api/config").then((r) => r.json() as Promise<{ microsoft: boolean }>) });
 
   const sendCode = async (event?: React.FormEvent) => {

@@ -3,10 +3,11 @@ import { fileSchema, folderSchema, listingSchema, nodeSchema, shareInfoSchema, s
 
 /**
  * Full page load on purpose: signing in or out must drop every cached query and re-run the
- * session check, which a client-side route change would keep.
+ * session check, which a client-side route change would keep. It replaces the current entry, so
+ * the browser's back button never returns to the sign-in page after signing in.
  */
 export function reload(path: string) {
-  window.location.href = path;
+  window.location.replace(path);
 }
 
 /** An API error with its HTTP status, so the share page can tell "password needed" from other failures. */
