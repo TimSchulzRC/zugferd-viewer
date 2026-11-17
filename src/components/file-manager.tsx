@@ -264,9 +264,17 @@ export function FileManager() {
       drag.active = true;
       frame = requestAnimationFrame(update);
     };
-    const end = () => {
-      if (marqueeDrag.current?.active) {
+    const end = (event: PointerEvent) => {
+      const drag = marqueeDrag.current;
+      if (drag?.active) {
+        // A quick drag can end before the next frame; count the rows up to where the pointer was released.
         cancelAnimationFrame(frame);
+        if (event.type === "pointerup") {
+          drag.pointerX = event.clientX;
+          drag.pointerY = event.clientY;
+          update();
+          cancelAnimationFrame(frame);
+        }
         setMarquee(null);
         // The click that follows the release would open the row under the pointer or clear the selection.
         swallowClick.current = true;
