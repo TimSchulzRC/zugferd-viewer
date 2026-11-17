@@ -80,11 +80,6 @@ export async function migrateAppTables(adminEmail: string) {
       updated_at timestamptz not null default now()
     )
   `.execute(db());
-  // Names are unique per folder, ignoring case, so downloads unpack cleanly on every OS.
-  await sql`
-    create unique index if not exists node_sibling_name
-      on node (coalesce(parent_id, '00000000-0000-0000-0000-000000000000'::uuid), lower(name))
-  `.execute(db());
   await sql`create index if not exists node_parent on node (parent_id)`.execute(db());
   // Links to a folder or file for one outside person, who proves with a mailed code that the link
   // reached them. Deleting the node deletes its links.
@@ -152,7 +147,8 @@ async function migrateOwners(adminEmail: string) {
   await sql`alter table node alter column owner_id set not null`.execute(db());
   await sql`create index if not exists node_owner on node (owner_id)`.execute(db());
 
-  // Top folders are per owner now, so two people may each have a folder "2025".
+  // Names are unique per folder, ignoring case, so downloads unpack cleanly on every OS. Top folders
+  // are per owner, so two people may each have a folder "2025". This replaces node_sibling_name.
   await sql`drop index if exists node_sibling_name`.execute(db());
   await sql`
     create unique index if not exists node_sibling_name_per_owner

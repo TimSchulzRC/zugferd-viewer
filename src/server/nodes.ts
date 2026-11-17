@@ -264,7 +264,11 @@ export async function fileFor(userId: string, id: string): Promise<FileDetails> 
 async function freeName(parentId: string | null, ownerId: string, wanted: string, executor: ReturnType<typeof db> = db()): Promise<string> {
   const query = executor.selectFrom("node").select("name");
   const siblings = await (parentId === null ? query.where("parent_id", "is", null).where("owner_id", "=", ownerId) : query.where("parent_id", "=", parentId)).execute();
-  const taken = new Set(siblings.map((s) => s.name.toLowerCase()));
+  return unused(wanted, new Set(siblings.map((s) => s.name.toLowerCase())));
+}
+
+/** The wanted name, or the first "name (n).ext" not in taken (lower case). */
+function unused(wanted: string, taken: Set<string>): string {
   if (!taken.has(wanted.toLowerCase())) return wanted;
   const dot = wanted.lastIndexOf(".");
   const [stem, extension] = dot > 0 ? [wanted.slice(0, dot), wanted.slice(dot)] : [wanted, ""];
@@ -366,21 +370,32 @@ export async function move(userId: string, ids: string[], parentId: string | nul
 
 /** Every file below the given nodes with its path relative to them, plus the folders (so empty ones survive a zip). */
 export async function tree(ids: string[]) {
-  const { rows: found } = await sql<{ kind: "folder" | "file"; path: string; storage_key: string | null; updated_at: Date }>`
+  const { rows: found } = await sql<{ kind: "folder" | "file"; path: string; storage_key: string | null; updated_at: Date; start: string }>`
     with recursive down as (
-      select id, kind, name::text as path, storage_key, updated_at from node where id = any(${ids}::uuid[])
+      select id, kind, name::text as path, storage_key, updated_at, id as start from node where id = any(${ids}::uuid[])
       union all
-      select n.id, n.kind, down.path || '/' || n.name, n.storage_key, n.updated_at from node n join down on n.parent_id = down.id
+      select n.id, n.kind, down.path || '/' || n.name, n.storage_key, n.updated_at, down.start from node n join down on n.parent_id = down.id
     )
-    select kind, path, storage_key, updated_at from down order by path
+    select kind, path, storage_key, updated_at, start from down order by path
   `.execute(db());
   return found;
 }
 
-/** What a download contains. Access to a folder covers everything inside it. */
+/**
+ * What a download contains. Access to a folder covers everything inside it. At the top, your folder
+ * "2025" and a colleague's shared "2025" sit side by side; in the zip the second becomes "2025 (2)".
+ */
 export async function treeFor(userId: string, ids: string[]) {
-  for (const id of ids) await requireAccess(userId, id, "view");
-  return tree(ids);
+  const names = new Map<string, string>();
+  for (const id of ids) names.set(id, (await requireAccess(userId, id, "view")).row.name);
+  const taken = new Set<string>();
+  const unique = new Map<string, string>();
+  for (const [id, name] of names) {
+    const free = unused(name, taken);
+    taken.add(free.toLowerCase());
+    unique.set(id, free);
+  }
+  return (await tree(ids)).map((entry) => ({ ...entry, path: unique.get(entry.start)! + entry.path.slice(names.get(entry.start)!.length) }));
 }
 
 export async function remove(userId: string, ids: string[]) {

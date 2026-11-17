@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { getMigrations } from "better-auth/db/migration";
 import { nextCookies } from "better-auth/next-js";
 import { admin, emailOTP } from "better-auth/plugins";
+import { defaultAc, userAc } from "better-auth/plugins/admin/access";
 import { headers } from "next/headers";
 import { migrateAppTables, pool } from "./db";
 import { env, microsoft } from "./env";
@@ -61,7 +62,14 @@ function create() {
           sendLoginCode(email, otp).catch((error) => console.error("Sending the login code failed", error));
         },
       }),
-      admin(),
+      // Admins manage who may sign in, nothing more. Impersonating someone or changing their address
+      // would let an admin open that person's files, which belong to them alone (see nodes.ts).
+      admin({
+        roles: {
+          admin: defaultAc.newRole({ user: ["list", "get", "set-role", "ban", "delete"], session: ["list", "revoke", "delete"] }),
+          user: userAc,
+        },
+      }),
       nextCookies(),
     ],
   });

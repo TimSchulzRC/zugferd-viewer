@@ -60,7 +60,7 @@ class Session {
     try {
       data = JSON.parse(text);
     } catch {}
-    return { status: response.status, data };
+    return { status: response.status, data, text };
   }
 
   async signIn() {
@@ -290,12 +290,30 @@ heading("5. Freigaben ändern und beenden");
 
 heading("6. Gleiche Namen bei verschiedenen Personen");
 {
-  const same = await ben.folder(null, "Anna privat");
-  check("Ben darf oben auch einen Ordner »Anna privat« haben", same.status === 200 && same.data?.name === "Anna privat", `${same.status} ${same.data?.name}`);
-  if (same.status === 200) await ben.remove([same.data.id]);
+  // Both stay in place: a server restart after this run must still start (the old global name index).
+  const annas = await must(await anna.folder(null, "Jahresordner 2025"), "Ordner anlegen");
+  await must(await anna.upload(annas.id, "rechnung-anna-2025.xml"), "Hochladen");
+  await must(await anna.grant(annas.id, null, false), "Für alle teilen");
+  const bens = await ben.folder(null, "Jahresordner 2025");
+  check("Ben darf oben auch einen »Jahresordner 2025« haben", bens.status === 200 && bens.data?.name === "Jahresordner 2025", `${bens.status} ${bens.data?.name}`);
+  await ben.upload(bens.data.id, "rechnung-ben-2025.xml");
+  check("Ben sieht beide nebeneinander", names(await ben.root()).filter((n) => n === "Jahresordner 2025").length === 2);
+  const zip = await ben.download([bens.data.id, annas.id]);
+  check(
+    "Beide zusammen herunterladen: im Zip heißt der zweite »Jahresordner 2025 (2)«",
+    zip.status === 200 && zip.text.includes("Jahresordner 2025/rechnung-ben-2025.xml") && zip.text.includes("Jahresordner 2025 (2)/rechnung-anna-2025.xml"),
+    `HTTP ${zip.status}`,
+  );
 }
 
-heading("7. Nutzer entfernen: der Admin übernimmt die Dateien");
+heading("7. Admins sehen keine fremden Dateien, auch nicht über Umwege");
+{
+  check("Als Anna anmelden (Impersonation) → abgelehnt", (await admin.fetch("/api/auth/admin/impersonate-user", { method: "POST", json: { userId: people[ANNA] } })).status === 403);
+  check("Annas Adresse ändern → abgelehnt", (await admin.fetch("/api/auth/admin/update-user", { method: "POST", json: { userId: people[ANNA], data: { email: "admin-postfach@demo.test" } } })).status === 403);
+  check("Nutzerliste laden geht weiterhin", (await admin.fetch("/api/auth/admin/list-users?limit=5")).status === 200);
+}
+
+heading("8. Nutzer entfernen: der Admin übernimmt die Dateien");
 {
   const doraFolder = await must(await dora.folder(null, "Dora Projekt"), "Ordner anlegen");
   await must(await dora.upload(doraFolder.id, "rechnung-dora.xml"), "Hochladen");
@@ -317,10 +335,10 @@ if (failed.length) {
 
 console.log(`
 \x1b[1mSelbst durchklicken\x1b[0m (${BASE}, Anmeldecode jeweils 000000, am besten je Person ein privates Fenster):
-  ${ANNA}   drei Ordner. Rechtsklick auf »Anna für alle (ansehen)« → Teilen zeigt »Alle Nutzer: Ansehen«.
-  ${BEN}    »Ben privat« und Annas zwei geteilte Ordner mit ihrer Adresse daneben. In »Anna für Ben« darf er
+  ${ANNA}   vier Ordner. Rechtsklick auf »Anna für alle (ansehen)« → Teilen zeigt »Alle Nutzer: Ansehen«.
+  ${BEN}    »Ben privat«, zweimal »Jahresordner 2025« (seiner, Annas) und Annas geteilte Ordner mit ihrer Adresse daneben. In »Anna für Ben« darf er
                   hochladen, in »Anna für alle« steht »Nur ansehen« und es gibt keinen Hochladen-Knopf.
-  ${CARLA}  »Anna für alle (ansehen)« und »Dora Projekt« (geteilt von der entfernten Dora, jetzt dem Admin).
+  ${CARLA}  »Anna für alle (ansehen)«, Annas »Jahresordner 2025« und »Dora Projekt« (geteilt von der entfernten Dora, jetzt dem Admin).
   ${ADMIN}  Eigenes plus »Von ${DORA}«. Annas und Bens private Ordner sieht er nicht.
 Was vor dem Update schon in der Datenbank lag, gehört dem, der es angelegt hat, und bleibt für alle zum
 Bearbeiten freigegeben. Das sehen deshalb alle zusätzlich.
