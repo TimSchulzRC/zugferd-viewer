@@ -1,13 +1,14 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Mail, Trash2, UserRound, Users } from "lucide-react";
+import { Copy, Eye, Mail, PenLine, Trash2, UserRound, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api, shareUrl } from "@/lib/api";
 import type { Node, Permission, Share } from "@/lib/nodes";
 import { cn } from "@/lib/utils";
@@ -74,8 +75,85 @@ function ShareRow({ share, onDelete }: { share: Share; onDelete: () => void }) {
   );
 }
 
-const SELECT = "h-8 w-full min-w-0 rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 const EVERYONE = "*";
+
+type Level = "view" | "edit";
+const LEVELS: Record<Level, { label: string; hint: string; icon: typeof Eye }> = {
+  view: { label: "Ansehen", hint: "Öffnen und herunterladen", icon: Eye },
+  edit: { label: "Bearbeiten", hint: "Auch hochladen, umbenennen, löschen", icon: PenLine },
+};
+
+function LevelSelect({ value, onChange, label }: { value: Level; onChange: (level: Level) => void; label: string }) {
+  return (
+    <Select items={{ view: LEVELS.view.label, edit: LEVELS.edit.label }} value={value} onValueChange={(next) => next && onChange(next as Level)}>
+      <SelectTrigger aria-label={label} className="w-36 bg-background">
+        <SelectValue>
+          {(current: Level) => {
+            const { icon: Icon, label: text } = LEVELS[current];
+            return (
+              <>
+                <Icon className="text-muted-foreground" /> {text}
+              </>
+            );
+          }}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent align="end" alignItemWithTrigger={false} className="min-w-72">
+        {(Object.keys(LEVELS) as Level[]).map((key) => {
+          const { icon: Icon, label: text, hint } = LEVELS[key];
+          return (
+            <SelectItem key={key} value={key} className="items-start py-1.5">
+              <Icon className="mt-0.5 text-muted-foreground" />
+              <span className="flex flex-col">
+                <span>{text}</span>
+                <span className="text-xs text-muted-foreground">{hint}</span>
+              </span>
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** Everyone first, then the people with an account, each with their own icon. */
+function PersonSelect({ value, onChange, everyone, people }: { value: string; onChange: (id: string) => void; everyone: boolean; people: { id: string; email: string }[] }) {
+  const items = [...(everyone ? [{ value: EVERYONE, label: "Alle Nutzer" }] : []), ...people.map((person) => ({ value: person.id, label: person.email }))];
+  return (
+    <Select items={items} value={value} onValueChange={(next) => next && onChange(next)}>
+      <SelectTrigger aria-label="Mit wem teilen" className="min-w-0 flex-1 basis-48 bg-background">
+        <SelectValue>
+          {(current: string) => (
+            <>
+              {current === EVERYONE ? <Users className="text-muted-foreground" /> : <UserRound className="text-muted-foreground" />}
+              <span className="truncate">{items.find((item) => item.value === current)?.label}</span>
+            </>
+          )}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent alignItemWithTrigger={false} className="max-h-72">
+        {everyone && (
+          <SelectGroup>
+            <SelectItem value={EVERYONE}>
+              <Users className="text-muted-foreground" /> Alle Nutzer
+            </SelectItem>
+          </SelectGroup>
+        )}
+        {everyone && people.length > 0 && <SelectSeparator />}
+        {people.length > 0 && (
+          <SelectGroup>
+            <SelectLabel>Personen</SelectLabel>
+            {people.map((person) => (
+              <SelectItem key={person.id} value={person.id}>
+                <UserRound className="text-muted-foreground" /> <span className="truncate">{person.email}</span>
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        )}
+      </SelectContent>
+    </Select>
+  );
+}
 
 function PermissionRow({ permission, onChange, onDelete }: { permission: Permission; onChange: (canEdit: boolean) => void; onDelete: () => void }) {
   const label = permission.userId === null ? "Alle Nutzer" : permission.email;
@@ -83,10 +161,7 @@ function PermissionRow({ permission, onChange, onDelete }: { permission: Permiss
     <li className="flex items-center gap-2 rounded-lg border p-2">
       {permission.userId === null ? <Users className="size-4 shrink-0 text-muted-foreground" /> : <UserRound className="size-4 shrink-0 text-muted-foreground" />}
       <p className="min-w-0 flex-1 truncate font-medium">{label}</p>
-      <select aria-label={`Rechte für ${label}`} className={cn(SELECT, "w-32")} value={permission.canEdit ? "edit" : "view"} onChange={(event) => onChange(event.target.value === "edit")}>
-        <option value="view">Ansehen</option>
-        <option value="edit">Bearbeiten</option>
-      </select>
+      <LevelSelect label={`Rechte für ${label}`} value={permission.canEdit ? "edit" : "view"} onChange={(level) => onChange(level === "edit")} />
       <Button variant="ghost" size="icon-sm" aria-label={`Freigabe für ${label} beenden`} onClick={onDelete}>
         <Trash2 />
       </Button>
@@ -100,7 +175,7 @@ function Colleagues({ node }: { node: Node }) {
   const permissions = useQuery({ queryKey: ["permissions", node.id], queryFn: () => api.permissions(node.id) });
   const colleagues = useQuery({ queryKey: ["colleagues"], queryFn: api.colleagues });
   const [who, setWho] = useState(EVERYONE);
-  const [level, setLevel] = useState<"view" | "edit">("view");
+  const [level, setLevel] = useState<Level>("view");
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["permissions", node.id] });
@@ -124,8 +199,10 @@ function Colleagues({ node }: { node: Node }) {
   });
 
   const taken = new Set(permissions.data?.map((permission) => permission.userId ?? EVERYONE));
-  const choices = [{ id: EVERYONE, email: "Alle Nutzer" }, ...(colleagues.data ?? [])].filter((choice) => !taken.has(choice.id));
-  const chosen = choices.some((choice) => choice.id === who) ? who : choices[0]?.id;
+  const everyone = !taken.has(EVERYONE);
+  const people = (colleagues.data ?? []).filter((person) => !taken.has(person.id));
+  const choices = [...(everyone ? [EVERYONE] : []), ...people.map((person) => person.id)];
+  const chosen = choices.includes(who) ? who : choices[0];
 
   return (
     <section className="flex flex-col gap-3">
@@ -150,17 +227,8 @@ function Colleagues({ node }: { node: Node }) {
             if (chosen) grant.mutate({ userId: chosen === EVERYONE ? null : chosen, canEdit: level === "edit" });
           }}
         >
-          <select aria-label="Mit wem teilen" className={cn(SELECT, "flex-1 basis-48")} value={chosen} onChange={(event) => setWho(event.target.value)}>
-            {choices.map((choice) => (
-              <option key={choice.id} value={choice.id}>
-                {choice.email}
-              </option>
-            ))}
-          </select>
-          <select aria-label="Rechte" className={cn(SELECT, "w-32")} value={level} onChange={(event) => setLevel(event.target.value as "view" | "edit")}>
-            <option value="view">Ansehen</option>
-            <option value="edit">Bearbeiten</option>
-          </select>
+          <PersonSelect value={chosen} onChange={setWho} everyone={everyone} people={people} />
+          <LevelSelect label="Rechte" value={level} onChange={setLevel} />
           <Button type="submit" disabled={!chosen || grant.isPending}>
             <Users /> Teilen
           </Button>
