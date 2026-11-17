@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, CircleCheck, CircleX, Download, LoaderCircle, TriangleAlert } from "lucide-react";
 import { parseAsBoolean, parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { EditableName } from "@/components/editable-name";
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -78,6 +80,15 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
   const recheck = useMutation({
     mutationFn: () => (source.revalidate ? source.revalidate(id) : Promise.reject(new Error("Nicht verfügbar"))),
     onSuccess: (data) => queryClient.setQueryData([source.key, "file", id], data),
+  });
+
+  const rename = useMutation({
+    mutationFn: (newName: string) => (source.rename ? source.rename(id, newName) : Promise.reject(new Error("Nicht verfügbar"))),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [source.key, "file", id] });
+      queryClient.invalidateQueries({ queryKey: ["nodes"] });
+    },
+    onError: (error) => toast.error(error.message),
   });
 
   const doc = opened.data?.doc ?? null;
@@ -246,7 +257,13 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
               <ArrowLeft />
             </Button>
           )}
-          <p className="truncate text-sm font-medium">{name}</p>
+          {name && source.rename ? (
+            <EditableName name={name} kind="file" onRename={(newName) => rename.mutate(newName)}>
+              <p className="truncate text-sm font-medium">{name}</p>
+            </EditableName>
+          ) : (
+            <p className="truncate text-sm font-medium">{name}</p>
+          )}
         </div>
         <div className="flex items-center gap-0.5 rounded-lg bg-muted p-[3px]" role="group" aria-label="Bereiche">
           {PANELS.filter((panel) => available[panel]).map((panel) => (
