@@ -6,7 +6,7 @@ import { db } from "./db";
 import { env } from "./env";
 import { HttpError } from "./http";
 import { sendShareCode, sendShareInvitation } from "./mail";
-import { children, content, details, find, MAX_DEPTH, pathTo, requireAccess, zipSegmentSql } from "./nodes";
+import { children, content, details, find, pathTo, requireAccess, zipSegmentSql } from "./nodes";
 
 /*
  * A share gives one outside person read access to a folder or file. The link alone is not enough:
@@ -252,18 +252,17 @@ export async function sharedContent(share: Row, id: string) {
 export async function sharedTree(share: Row, ids: string[]) {
   const { rows } = await sql<{ kind: "folder" | "file"; path: string; storage_key: string | null; updated_at: Date; start: string | null }>`
     with recursive scope as (
-      select id, 0 as depth from node where id = ${share.node_id}
+      select id from node where id = ${share.node_id}
       union all
-      select n.id, scope.depth + 1 from node n join scope on n.parent_id = scope.id where scope.depth < ${MAX_DEPTH}
-    ),
+      select n.id from node n join scope on n.parent_id = scope.id
+    ) cycle id set is_cycle using visited,
     down as (
-      select id, kind, ${zipSegmentSql("name")}::text as path, storage_key, updated_at, id as start, 0 as depth from node
+      select id, kind, ${zipSegmentSql("name")}::text as path, storage_key, updated_at, id as start from node
         where id = any(${ids}::uuid[]) and id in (select id from scope)
       union all
-      select n.id, n.kind, down.path || '/' || ${zipSegmentSql("n.name")}, n.storage_key, n.updated_at, null, down.depth + 1
-        from node n join down on n.parent_id = down.id where down.depth < ${MAX_DEPTH}
-    )
-    select kind, path, storage_key, updated_at, start from down order by path
+      select n.id, n.kind, down.path || '/' || ${zipSegmentSql("n.name")}, n.storage_key, n.updated_at, null from node n join down on n.parent_id = down.id
+    ) cycle id set is_cycle using visited
+    select kind, path, storage_key, updated_at, start from down where not is_cycle order by path
   `.execute(db());
   const found = new Set(rows.flatMap((row) => (row.start ? [row.start] : [])));
   if (ids.some((id) => !found.has(id))) throw new HttpError(404, "Nicht gefunden");

@@ -134,8 +134,8 @@ async function migrateOwners(adminEmail: string) {
             select id, coalesce(created_by, (select id from admin)) as owner from node where parent_id is null and owner_id is null
             union all
             select n.id, tree.owner from node n join tree on n.parent_id = tree.id
-          )
-          update node set owner_id = tree.owner from tree where node.id = tree.id
+          ) cycle id set is_cycle using visited
+          update node set owner_id = tree.owner from tree where node.id = tree.id and not tree.is_cycle
         `.execute(trx);
         await sql`
           insert into permission (node_id, user_id, can_edit)
@@ -143,6 +143,8 @@ async function migrateOwners(adminEmail: string) {
           on conflict do nothing
         `.execute(trx);
       }
+      // Whatever no top folder reaches (only possible through a cycle) goes to the administrator.
+      await sql`update node set owner_id = (select id from "user" where email = ${adminEmail}) where owner_id is null`.execute(trx);
     });
   await sql`alter table node alter column owner_id set not null`.execute(db());
   await sql`create index if not exists node_owner on node (owner_id)`.execute(db());

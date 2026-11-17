@@ -33,11 +33,11 @@ type Row = {
 
 const RANK: Record<Access, number> = { view: 1, edit: 2, owner: 3 };
 
-/**
- * Every walk up or down the tree stops this deep. Folders never nest that far; the limit only matters
- * if a cycle slipped in, which would otherwise keep a recursive query (and a connection) busy forever.
+/*
+ * Every recursive walk up or down the tree carries Postgres' CYCLE clause. Moves cannot create a
+ * cycle (see move), but if one ever slipped in, a walk without it would keep a query and its
+ * connection busy forever. Rows marked is_cycle repeat a node already visited and are left out.
  */
-export const MAX_DEPTH = sql.lit(256);
 
 /** A name as one path segment in a zip: never a separator, never "." or "..". Matches zipSegment in SQL. */
 export const zipSegmentSql = (column: string) => sql.raw(`(case when ${column} in ('.', '..') then '_' else translate(${column}, '/\\', '__') end)`);
@@ -100,10 +100,10 @@ export async function accessTo(userId: string, id: string) {
   if (row.owner_id === userId) return { row, access: "owner" as Access };
   const { rows } = await sql<{ can_edit: boolean | null }>`
     with recursive up as (
-      select id, parent_id, 0 as depth from node where id = ${id}
+      select id, parent_id from node where id = ${id}
       union all
-      select n.id, n.parent_id, up.depth + 1 from node n join up on n.id = up.parent_id where up.depth < ${MAX_DEPTH}
-    )
+      select n.id, n.parent_id from node n join up on n.id = up.parent_id
+    ) cycle id set is_cycle using visited
     select bool_or(permission.can_edit) as can_edit from up join permission on permission.node_id = up.id and ${forUser(userId)}
   `.execute(db());
   return { row, access: grantOf(rows[0]?.can_edit) };
@@ -153,9 +153,9 @@ export async function pathTo(id: string | null): Promise<Crumb[]> {
     with recursive up as (
       select id, parent_id, name, 0 as depth from node where id = ${id}
       union all
-      select n.id, n.parent_id, n.name, up.depth + 1 from node n join up on n.id = up.parent_id where up.depth < ${MAX_DEPTH}
-    )
-    select id, name, depth from up order by depth desc
+      select n.id, n.parent_id, n.name, up.depth + 1 from node n join up on n.id = up.parent_id
+    ) cycle id set is_cycle using visited
+    select id, name, depth from up where not is_cycle order by depth desc
   `.execute(db());
   return rows.map(({ id, name }) => ({ id, name }));
 }
@@ -207,10 +207,10 @@ async function top(userId: string): Promise<Node[]> {
     where n.owner_id <> ${userId}
       and not exists (
         with recursive up as (
-          select parent_id as id, 0 as depth from node where id = n.id
+          select parent_id as id from node where id = n.id
           union all
-          select m.parent_id, up.depth + 1 from node m join up on m.id = up.id where up.depth < ${MAX_DEPTH}
-        )
+          select m.parent_id from node m join up on m.id = up.id
+        ) cycle id set is_cycle using visited
         select 1 from up join permission q on q.node_id = up.id and (q.user_id = ${userId} or q.user_id is null)
       )
   `.execute(db());
@@ -388,10 +388,10 @@ export async function move(userId: string, ids: string[], parentId: string | nul
       await sql`select pg_advisory_xact_lock(hashtext(${`move:${ownerId}`}))`.execute(trx);
       const { rows: up } = await sql<{ id: string }>`
         with recursive up as (
-          select id, parent_id, 0 as depth from node where id = ${parentId}
+          select id, parent_id from node where id = ${parentId}
           union all
-          select n.id, n.parent_id, up.depth + 1 from node n join up on n.id = up.parent_id where up.depth < ${MAX_DEPTH}
-        )
+          select n.id, n.parent_id from node n join up on n.id = up.parent_id
+        ) cycle id set is_cycle using visited
         select id from up
       `.execute(trx);
       const ancestors = new Set(up.map((row) => row.id));
@@ -404,12 +404,11 @@ export async function move(userId: string, ids: string[], parentId: string | nul
 export async function tree(ids: string[]) {
   const { rows: found } = await sql<{ kind: "folder" | "file"; path: string; storage_key: string | null; updated_at: Date; start: string }>`
     with recursive down as (
-      select id, kind, ${zipSegmentSql("name")}::text as path, storage_key, updated_at, id as start, 0 as depth from node where id = any(${ids}::uuid[])
+      select id, kind, ${zipSegmentSql("name")}::text as path, storage_key, updated_at, id as start from node where id = any(${ids}::uuid[])
       union all
-      select n.id, n.kind, down.path || '/' || ${zipSegmentSql("n.name")}, n.storage_key, n.updated_at, down.start, down.depth + 1
-        from node n join down on n.parent_id = down.id where down.depth < ${MAX_DEPTH}
-    )
-    select kind, path, storage_key, updated_at, start from down order by path
+      select n.id, n.kind, down.path || '/' || ${zipSegmentSql("n.name")}, n.storage_key, n.updated_at, down.start from node n join down on n.parent_id = down.id
+    ) cycle id set is_cycle using visited
+    select kind, path, storage_key, updated_at, start from down where not is_cycle order by path
   `.execute(db());
   return found;
 }
