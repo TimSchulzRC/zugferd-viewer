@@ -89,8 +89,9 @@ export type Source = {
   file: (id: string) => Promise<FileDetails>;
   contentUrl: (id: string) => string;
   download: (ids: string[]) => void;
-  /** Only signed-in users can re-run the validator. */
+  /** Only signed-in users can re-run the validator or rename. */
   revalidate?: (id: string) => Promise<FileDetails>;
+  rename?: (id: string, name: string) => Promise<unknown>;
 };
 
 export const ownSource: Source = {
@@ -99,6 +100,7 @@ export const ownSource: Source = {
   contentUrl: (id) => `/api/nodes/${id}/content`,
   download: (ids) => download(ids),
   revalidate: api.revalidate,
+  rename: api.rename,
 };
 
 export function shareSource(token: string): Source {

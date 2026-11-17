@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, ChevronRight, CircleCheck, CircleX, Download, FileT
 import { parseAsString, useQueryStates } from "nuqs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { EditableName, RenameInput } from "@/components/editable-name";
 import { MoveDialog } from "@/components/move-dialog";
 import { ShareDialog } from "@/components/share-dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -44,40 +45,6 @@ export const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium"
 export function formatSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024)).toLocaleString("de-DE")} kB`;
   return `${(bytes / 1024 / 1024).toLocaleString("de-DE", { maximumFractionDigits: 1 })} MB`;
-}
-
-function RenameInput({ node, onDone }: { node: Node; onDone: (name: string | null) => void }) {
-  const ref = useRef<HTMLInputElement>(null);
-  const done = useRef(false);
-  useEffect(() => {
-    const input = ref.current!;
-    input.focus();
-    // Leave the extension unselected so typing replaces only the name.
-    const dot = node.kind === "file" ? node.name.lastIndexOf(".") : -1;
-    input.setSelectionRange(0, dot > 0 ? dot : node.name.length);
-  }, [node]);
-
-  const finish = (name: string | null) => {
-    if (done.current) return;
-    done.current = true;
-    onDone(name);
-  };
-
-  return (
-    <input
-      ref={ref}
-      defaultValue={node.name}
-      aria-label="Name"
-      className="h-7 min-w-0 flex-1 rounded-md border border-ring bg-background px-1.5 text-sm outline-none ring-2 ring-ring/30"
-      onClick={(event) => event.stopPropagation()}
-      onBlur={(event) => finish(event.target.value)}
-      onKeyDown={(event) => {
-        event.stopPropagation();
-        if (event.key === "Enter") finish(event.currentTarget.value);
-        if (event.key === "Escape") finish(null);
-      }}
-    />
-  );
 }
 
 export function FileManager() {
@@ -341,9 +308,7 @@ export function FileManager() {
           {crumbs.map((crumb, index) => {
             const last = index === crumbs.length - 1;
             const key = `crumb:${crumb.id}`;
-            return (
-              <div key={key} className="flex min-w-0 items-center gap-0.5">
-                {index > 0 && <ChevronRight className="size-4 shrink-0 text-muted-foreground" />}
+            const button = (
                 <button
                   type="button"
                   aria-current={last ? "page" : undefined}
@@ -357,6 +322,18 @@ export function FileManager() {
                 >
                   {crumb.name}
                 </button>
+            );
+            return (
+              <div key={key} className="flex min-w-0 items-center gap-0.5">
+                {index > 0 && <ChevronRight className="size-4 shrink-0 text-muted-foreground" />}
+                {/* The folder you are in can be renamed right here. The root is not a folder of its own. */}
+                {last && crumb.id ? (
+                  <EditableName name={crumb.name} kind="folder" onRename={(name) => rename.mutate({ id: crumb.id!, name })}>
+                    {button}
+                  </EditableName>
+                ) : (
+                  button
+                )}
               </div>
             );
           })}
@@ -501,7 +478,8 @@ export function FileManager() {
                   {node.kind === "folder" ? <Folder className="size-4 shrink-0 fill-sky-500/20 text-sky-600" /> : <FileText className="size-4 shrink-0 text-muted-foreground" />}
                   {renaming === node.id ? (
                     <RenameInput
-                      node={node}
+                      name={node.name}
+                      kind={node.kind}
                       onDone={(name) => {
                         setRenaming(null);
                         if (name && name.trim() !== node.name) rename.mutate({ id: node.id, name: name.trim() });
