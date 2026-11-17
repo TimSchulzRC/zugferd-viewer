@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, CircleCheck, CircleX, Download, Eye, FileText, Folder, FolderInput, FolderPlus, PenLine, Share2, Trash2, TriangleAlert, Upload, Users, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, CircleCheck, CircleX, Download, Eye, FileText, Folder, FolderInput, FolderPlus, PenLine, Share2, Trash2, TriangleAlert, Upload, Users, X } from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -317,7 +317,7 @@ export function FileManager() {
         {ordner !== null && (
           // One level up. The path only shows folders you can open, so this never leads somewhere closed.
           <Button variant="ghost" size="icon-sm" aria-label="Eine Ebene hoch" title="Eine Ebene hoch" onClick={() => setQuery({ ordner: crumbs.at(-2)?.id ?? null })}>
-            <ArrowLeft />
+            <ArrowUp />
           </Button>
         )}
         <nav aria-label="Pfad" className="flex min-w-0 flex-1 items-center gap-0.5 text-sm">
