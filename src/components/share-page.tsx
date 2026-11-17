@@ -115,7 +115,7 @@ function CodeForm({ token, email }: { token: string; email: string }) {
 }
 
 function SharedFolder({ token, name, rootId, expiresOn }: { token: string; name: string; rootId: string; expiresOn: string | null }) {
-  const [{ ordner }, setQuery] = useQueryStates({ ordner: parseAsString, datei: parseAsString });
+  const [{ ordner }, setQuery] = useQueryStates({ ordner: parseAsString, datei: parseAsString }, { history: "push" });
   const share = shareApi(token);
   const source = shareSource(token);
   const listing = useQuery({ queryKey: ["share", token, "nodes", ordner], queryFn: () => share.list(ordner) });

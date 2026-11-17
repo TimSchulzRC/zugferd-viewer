@@ -148,13 +148,14 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
     };
   }, [focus]);
 
-  const back = () => setQuery({ datei: null, ordner: details.data?.node.parentId ?? query.ordner });
+  // Leaving the file is navigation, unlike toggling panels, so it gets a history entry.
+  const back = () => setQuery({ datei: null, ordner: details.data?.node.parentId ?? query.ordner }, { history: "push" });
 
   if (details.isError || opened.isError) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm">
         <p>{(details.error ?? opened.error)?.message}</p>
-        <Button variant="outline" size="sm" onClick={() => setQuery({ datei: null })}>
+        <Button variant="outline" size="sm" onClick={() => setQuery({ datei: null }, { history: "push" })}>
           Zurück
         </Button>
       </main>
