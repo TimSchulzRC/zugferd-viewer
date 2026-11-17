@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Eye, Mail, PenLine, Trash2, UserRound, Users } from "lucide-react";
+import { Copy, Eye, Mail, PenLine, Share2, Trash2, UserRound, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -230,7 +230,7 @@ function Colleagues({ node }: { node: Node }) {
           <PersonSelect value={chosen} onChange={setWho} everyone={everyone} people={people} />
           <LevelSelect label="Rechte" value={level} onChange={setLevel} />
           <Button type="submit" disabled={!chosen || grant.isPending}>
-            <Users /> Teilen
+            {taken.size > 0 ? <Users /> : <Share2 />} Teilen
           </Button>
         </form>
       )}
