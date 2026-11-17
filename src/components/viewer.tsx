@@ -12,7 +12,7 @@ import { ValidationPanel, type Validation } from "@/components/validation-panel"
 import { XmlPretty } from "@/components/xml-pretty";
 import { XmlRaw } from "@/components/xml-raw";
 import { ownSource, type Source } from "@/lib/api";
-import { findElement, resolveTerm } from "@/lib/cii";
+import { buildInvoice, findElement, highlightedElements, highlightFor, resolveTerm } from "@/lib/cii";
 import { openFile } from "@/lib/open-file";
 import { describeProfile, type Finding, offersXRechnung, reportFor, RULESETS } from "@/lib/report";
 import { parseLocation } from "@/lib/terms";
@@ -82,6 +82,7 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
 
   const doc = opened.data?.doc ?? null;
   const formatted = useMemo(() => (doc ? formatXml(doc) : null), [doc]);
+  const invoice = useMemo(() => (doc ? buildInvoice(doc) : null), [doc]);
   const stored = details.data?.report ?? null;
   const choosable = offersXRechnung(stored);
   const ruleset = choosable ? query.regeln : "zugferd";
@@ -96,14 +97,19 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
   /** Where a finding points in the XML: the element the validator named, else the first element of its terms. */
   const target = useCallback(
     (finding: Finding): { element: Element | null; line: number | undefined } | null => {
-      if (!doc || !formatted) return null;
+      if (!doc || !formatted || !invoice) return null;
       const located = finding.location ? findElement(doc, parseLocation(finding.location)) : null;
       const byTerm = located ? null : [...doc.getElementsByTagName("*")].find((el) => finding.terms.includes(resolveTerm(el)?.id ?? ""));
       const element = located ?? byTerm ?? null;
       if (!element && !finding.terms.length) return null;
-      return { element: located, line: element ? formatted.lineOf.get(element) : undefined };
+      if (element) return { element: located, line: formatted.lineOf.get(element) };
+      // A term the file lacks has no line of its own. The raw view then goes where the prettified view
+      // marks it (the group the term belongs in, or the invoice header), at the first of those lines.
+      const highlight = highlightFor(invoice, null, finding.terms);
+      const lines = (highlight ? highlightedElements(invoice, highlight) : []).map((el) => formatted.lineOf.get(el)).filter((line) => line !== undefined);
+      return { element: null, line: lines.length ? Math.min(...lines) : undefined };
     },
-    [doc, formatted],
+    [doc, formatted, invoice],
   );
 
   const errorLines = useMemo(() => {
@@ -115,6 +121,21 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
     }
     return lines;
   }, [report, target]);
+
+  // A click on empty space or Escape removes the mark. Controls keep it, so switching views or clicking another finding works.
+  useEffect(() => {
+    if (!focus) return;
+    const clear = (event: PointerEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent ? event.key !== "Escape" : (event.target as Element).closest("button, a, input, summary, [role=tab], [role=separator]")) return;
+      setFocus(null);
+    };
+    window.addEventListener("pointerdown", clear);
+    window.addEventListener("keydown", clear);
+    return () => {
+      window.removeEventListener("pointerdown", clear);
+      window.removeEventListener("keydown", clear);
+    };
+  }, [focus]);
 
   const back = () => setQuery({ datei: null, ordner: details.data?.node.parentId ?? query.ordner });
 
@@ -189,8 +210,8 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
             <Empty>Diese PDF enthält keine Rechnungsdaten.</Empty>
           ) : query.view === "roh" ? (
             <XmlRaw formatted={formatted} source={file.xml} errorLines={errorLines} focus={focus?.line !== undefined ? { line: focus.line } : null} />
-          ) : file.doc ? (
-            <XmlPretty doc={file.doc} focus={focus} />
+          ) : invoice ? (
+            <XmlPretty invoice={invoice} focus={focus} />
           ) : (
             <Empty>Das XML ist nicht wohlgeformt.</Empty>
           )}

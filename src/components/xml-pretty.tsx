@@ -2,7 +2,7 @@
 
 import { ChevronRight } from "lucide-react";
 import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { buildInvoice, highlightFor, type Field, type Group, type Highlight } from "@/lib/cii";
+import { highlightFor, type Field, type Group, type Highlight, type Invoice } from "@/lib/cii";
 import type { Finding } from "@/lib/report";
 import { cn } from "@/lib/utils";
 
@@ -200,8 +200,7 @@ function Totals({ group }: { group: Group }) {
 
 export type PrettyFocus = { finding: Finding; element: Element | null };
 
-export function XmlPretty({ doc, focus }: { doc: Document; focus: PrettyFocus | null }) {
-  const invoice = useMemo(() => buildInvoice(doc), [doc]);
+export function XmlPretty({ invoice, focus }: { invoice: Invoice; focus: PrettyFocus | null }) {
   const { root } = invoice;
   const highlight = useMemo(() => (focus ? highlightFor(invoice, focus.element, focus.finding.terms) : null), [invoice, focus]);
   const container = useRef<HTMLDivElement>(null);
