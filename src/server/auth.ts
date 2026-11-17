@@ -2,11 +2,13 @@ import { betterAuth } from "better-auth";
 import { getMigrations } from "better-auth/db/migration";
 import { nextCookies } from "better-auth/next-js";
 import { admin, emailOTP } from "better-auth/plugins";
+import { defaultAc, userAc } from "better-auth/plugins/admin/access";
 import { headers } from "next/headers";
 import { migrateAppTables, pool } from "./db";
 import { env, microsoft } from "./env";
 import { devCode } from "@/lib/dev";
 import { sendLoginCode } from "./mail";
+import { handOver } from "./nodes";
 import { checkBucket } from "./storage";
 
 function create() {
@@ -28,6 +30,16 @@ function create() {
       },
     },
     databaseHooks: {
+      user: {
+        delete: {
+          // Files must not vanish with their owner: the admin who removes the person takes them over.
+          before: async (user, context) => {
+            const by = (context?.context.session as { user?: { id: string } } | null | undefined)?.user?.id ?? (await adminId());
+            if (!by || by === user.id) return false;
+            await handOver({ id: user.id, email: user.email }, by);
+          },
+        },
+      },
       session: {
         create: {
           // A user who has signed in once is no longer shown as "invited".
@@ -50,7 +62,15 @@ function create() {
           sendLoginCode(email, otp).catch((error) => console.error("Sending the login code failed", error));
         },
       }),
-      admin(),
+      // Admins manage who may sign in, nothing more. Impersonating someone or changing their address
+      // would let an admin open that person's files, which belong to them alone (see nodes.ts).
+      admin({
+        roles: {
+          // No session rights either: listing someone's sessions shows their tokens and IP addresses.
+          admin: defaultAc.newRole({ user: ["list", "get", "set-role", "ban", "delete"], session: [] }),
+          user: userAc,
+        },
+      }),
       nextCookies(),
     ],
   });
@@ -78,16 +98,22 @@ export async function createUser(email: string, role: "admin" | "user"): Promise
   return true;
 }
 
+async function adminId(): Promise<string | null> {
+  const { rows } = await pool().query<{ id: string }>('select id from "user" where email = $1', [env().ADMIN_EMAIL]);
+  return rows[0]?.id ?? null;
+}
+
 /** Brings the schema up to date and makes sure the first administrator exists. Runs once per process. */
 export function ready(): Promise<void> {
   return (globals.zugferdReady ??= (async () => {
     const { runMigrations } = await getMigrations(auth().options);
     await runMigrations();
-    await migrateAppTables();
     const { ADMIN_EMAIL, APP_URL } = env();
     console.log(`Public URL: ${APP_URL}`);
     void checkBucket();
     await createUser(ADMIN_EMAIL, "admin");
     await pool().query(`update "user" set role = 'admin' where email = $1 and role is distinct from 'admin'`, [ADMIN_EMAIL]);
+    // After the administrator exists: files from before owners existed may go to them.
+    await migrateAppTables(ADMIN_EMAIL);
   })());
 }

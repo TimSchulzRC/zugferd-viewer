@@ -1,13 +1,14 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, ChevronRight, CircleCheck, CircleX, Download, FileText, Folder, FolderInput, FolderPlus, Link2, PenLine, Share2, Trash2, TriangleAlert, Upload, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, CircleCheck, CircleX, Download, Eye, FileText, Folder, FolderInput, FolderPlus, PenLine, Share2, Trash2, TriangleAlert, Upload, Users, X } from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { EditableName, RenameInput } from "@/components/editable-name";
 import { MoveDialog } from "@/components/move-dialog";
 import { ShareDialog } from "@/components/share-dialog";
+import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -32,7 +33,8 @@ const COLUMNS: { key: SortKey; label: string; className: string }[] = [
   { key: "size", label: "Größe", className: "justify-end text-right" },
   { key: "updatedAt", label: "Geändert", className: "hidden @2xl:flex" },
 ];
-const GRID = "grid grid-cols-[minmax(0,1fr)_9rem_5.5rem] @2xl:grid-cols-[minmax(0,1fr)_9rem_5.5rem_10rem] items-center gap-3 px-4";
+// The last column holds the sharing button.
+const GRID = "grid grid-cols-[minmax(0,1fr)_9rem_5.5rem_1.5rem] @2xl:grid-cols-[minmax(0,1fr)_9rem_5.5rem_10rem_1.5rem] items-center gap-3 px-4";
 
 export const STATUS = {
   einvoice: { label: "E-Rechnung", icon: CircleCheck, color: "text-emerald-600" },
@@ -90,6 +92,11 @@ export function FileManager() {
   }, [listing.data, sort]);
 
   const selection = items.filter((item) => selected.has(item.id));
+  // At the top, things others shared with you sit in their folder, not yours: only your own can change.
+  const folderAccess = listing.data?.access ?? (ordner === null ? "owner" : "view");
+  const canAdd = folderAccess !== "view";
+  const canChange = (node: Node) => (ordner === null ? node.access === "owner" : canAdd);
+  const changeable = selection.length > 0 && selection.every(canChange);
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["nodes"] });
     queryClient.invalidateQueries({ queryKey: ["folders"] });
@@ -153,8 +160,8 @@ export function FileManager() {
     if (renaming || deleting || moving || sharing || (event.target as HTMLElement).closest("input, textarea, [role=menu], [role=dialog], [role=alertdialog]")) return;
     const single = selection.length === 1 ? selection[0] : null;
     if (event.key === "Enter" && single) open(single);
-    else if (event.key === "F2" && single) setRenaming(single.id);
-    else if ((event.key === "Delete" || event.key === "Backspace") && selection.length) setDeleting(selection);
+    else if (event.key === "F2" && single && canChange(single)) setRenaming(single.id);
+    else if ((event.key === "Delete" || event.key === "Backspace") && changeable) setDeleting(selection);
     else if (event.key === "Escape") setSelected(new Set());
     else if (event.key === "a" && (event.metaKey || event.ctrlKey)) setSelected(new Set(items.map((item) => item.id)));
     else if ((event.key === "ArrowDown" || event.key === "ArrowUp") && items.length) {
@@ -262,8 +269,10 @@ export function FileManager() {
   }, []);
 
   /** Shared by folder rows, breadcrumbs and the list itself: accepts rows dragged within the app and files from outside. */
-  const dropProps = (targetId: string | null, key: string) => ({
+  const dropProps = (targetId: string | null, key: string, accepts = true) => ({
     onDragOver: (event: React.DragEvent) => {
+      // A folder you may only look at takes nothing. The server checks again.
+      if (!accepts) return;
       const internal = event.dataTransfer.types.includes(DRAG_TYPE);
       if (!internal && !event.dataTransfer.types.includes("Files")) return;
       // Dropping rows onto the folder they are already in would do nothing.
@@ -305,6 +314,12 @@ export function FileManager() {
       <header className="shrink-0 border-b">
         <div className="mx-auto flex h-12 w-full max-w-6xl items-center gap-2 px-3">
         <Logo className="size-6 shrink-0" />
+        {ordner !== null && (
+          // One level up. The path only shows folders you can open, so this never leads somewhere closed.
+          <Button variant="ghost" size="icon-sm" aria-label="Eine Ebene hoch" title="Eine Ebene hoch" onClick={() => setQuery({ ordner: crumbs.at(-2)?.id ?? null })}>
+            <ArrowUp />
+          </Button>
+        )}
         <nav aria-label="Pfad" className="flex min-w-0 flex-1 items-center gap-0.5 text-sm">
           {crumbs.map((crumb, index) => {
             const last = index === crumbs.length - 1;
@@ -314,7 +329,7 @@ export function FileManager() {
                   type="button"
                   aria-current={last ? "page" : undefined}
                   onClick={() => setQuery({ ordner: crumb.id })}
-                  {...dropProps(crumb.id, key)}
+                  {...dropProps(crumb.id, key, crumb.id !== ordner || canAdd)}
                   className={cn(
                     "truncate rounded-md px-1.5 py-1 hover:bg-muted",
                     last ? "font-medium" : "text-muted-foreground",
@@ -328,7 +343,8 @@ export function FileManager() {
               <div key={key} className="flex min-w-0 items-center gap-0.5">
                 {index > 0 && <ChevronRight className="size-4 shrink-0 text-muted-foreground" />}
                 {/* The folder you are in can be renamed right here. The root is not a folder of its own. */}
-                {last && crumb.id ? (
+                {/* Someone a folder is shared with works inside it but cannot rename the shared folder itself. */}
+                {last && crumb.id && (folderAccess === "owner" || (folderAccess === "edit" && index > 1)) ? (
                   <EditableName name={crumb.name} kind="folder" onRename={(name) => rename.mutate({ id: crumb.id!, name })}>
                     {button}
                   </EditableName>
@@ -338,12 +354,17 @@ export function FileManager() {
               </div>
             );
           })}
+          {!canAdd && (
+            <Badge variant="secondary" className="ml-1.5">
+              <Eye /> Nur ansehen
+            </Badge>
+          )}
         </nav>
 
         {selection.length > 0 ? (
           <>
             <span className="text-sm text-muted-foreground tabular-nums">{selection.length} ausgewählt</span>
-            {single && (
+            {single?.access === "owner" && (
               <Button variant="outline" size="sm" onClick={() => setSharing(single)}>
                 <Share2 /> Teilen
               </Button>
@@ -351,25 +372,31 @@ export function FileManager() {
             <Button variant="outline" size="sm" onClick={() => download(selection.map((node) => node.id))}>
               <Download /> Herunterladen
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setMoving(selection)}>
-              <FolderInput /> Verschieben
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setDeleting(selection)}>
-              <Trash2 /> Löschen
-            </Button>
+            {changeable && (
+              <>
+                <Button variant="outline" size="sm" onClick={() => setMoving(selection)}>
+                  <FolderInput /> Verschieben
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setDeleting(selection)}>
+                  <Trash2 /> Löschen
+                </Button>
+              </>
+            )}
             <Button variant="ghost" size="icon-sm" aria-label="Auswahl aufheben" onClick={() => setSelected(new Set())}>
               <X />
             </Button>
           </>
         ) : (
-          <>
-            <Button variant="outline" size="sm" onClick={() => createFolder.mutate()}>
-              <FolderPlus /> Neuer Ordner
-            </Button>
-            <Button size="sm" onClick={() => fileInput.current?.click()}>
-              <Upload /> Hochladen
-            </Button>
-          </>
+          canAdd && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => createFolder.mutate()}>
+                <FolderPlus /> Neuer Ordner
+              </Button>
+              <Button size="sm" onClick={() => fileInput.current?.click()}>
+                <Upload /> Hochladen
+              </Button>
+            </>
+          )
         )}
         <UserMenu />
         </div>
@@ -392,7 +419,7 @@ export function FileManager() {
               onContextMenu={(event) => {
                 if (!(event.target as HTMLElement).closest("[data-row]")) setSelected(new Set());
               }}
-              {...dropProps(ordner, "list")}
+              {...dropProps(ordner, "list", canAdd)}
               className={cn("relative min-h-0 flex-1 overflow-auto outline-none select-none", dropTarget === "list" && "bg-primary/5 ring-2 ring-primary ring-inset")}
             />
           }
@@ -428,6 +455,7 @@ export function FileManager() {
                 </div>
               );
             })}
+            <span className="sr-only">Freigabe</span>
           </div>
 
           {items.map((node) => {
@@ -448,7 +476,7 @@ export function FileManager() {
                     setAnchor(node.id);
                   }
                 }}
-                {...(node.kind === "folder" ? dropProps(node.id, key) : {})}
+                {...(node.kind === "folder" ? dropProps(node.id, key, node.access !== "view") : {})}
                 className={cn(
                   GRID,
                   "h-10 cursor-pointer border-b text-sm select-none",
@@ -467,7 +495,7 @@ export function FileManager() {
                   />
                   {/* Dragging the icon or name moves the row; dragging anywhere else in the row draws a selection rectangle. */}
                   <div
-                    draggable={renaming !== node.id}
+                    draggable={renaming !== node.id && canChange(node)}
                     onDragStart={(event) => {
                       const ids = isSelected ? [...selected] : [node.id];
                       if (!isSelected) setSelected(new Set(ids));
@@ -490,20 +518,6 @@ export function FileManager() {
                     <span className="truncate">{node.name}</span>
                   )}
                   </div>
-                  {node.shared && (
-                    <button
-                      type="button"
-                      title="Per Link geteilt"
-                      aria-label={`Freigaben von ${node.name}`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setSharing(node);
-                      }}
-                      className="shrink-0 rounded p-0.5 text-sky-600 hover:bg-muted"
-                    >
-                      <Link2 className="size-4" />
-                    </button>
-                  )}
                 </div>
                 <div className="flex items-center gap-1.5 whitespace-nowrap">
                   {status && (
@@ -515,14 +529,46 @@ export function FileManager() {
                 </div>
                 <div className="text-right text-muted-foreground tabular-nums">{node.size !== null && formatSize(node.size)}</div>
                 <div className="hidden whitespace-nowrap text-muted-foreground @2xl:block">{dateFormat.format(new Date(node.updatedAt))}</div>
+                <div className="flex justify-end">
+                  {node.shared && (
+                    <button
+                      type="button"
+                      title="Geteilt"
+                      aria-label={`Freigaben von ${node.name}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setSharing(node);
+                      }}
+                      className="rounded p-0.5 text-sky-600 hover:bg-muted"
+                    >
+                      <Users className="size-4" />
+                    </button>
+                  )}
+                  {ordner === null && node.owner && (
+                    <span
+                      role="img"
+                      title={`Geteilt von ${node.owner}${node.access === "view" ? ", nur ansehen" : ""}`}
+                      aria-label={`Geteilt von ${node.owner}${node.access === "view" ? ", nur ansehen" : ""}`}
+                      className="p-0.5 text-muted-foreground"
+                    >
+                      <Users className="size-4" />
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}
 
           {listing.isSuccess && items.length === 0 && (
             <div className="flex flex-col items-center gap-2 px-6 py-24 text-center text-sm text-muted-foreground">
-              <Upload className="size-8" strokeWidth={1.5} />
-              <p>PDF- und XML-Rechnungen hierher ziehen</p>
+              {canAdd ? (
+                <>
+                  <Upload className="size-8" strokeWidth={1.5} />
+                  <p>PDF- und XML-Rechnungen hierher ziehen</p>
+                </>
+              ) : (
+                <p>Dieser Ordner ist leer</p>
+              )}
             </div>
           )}
           {listing.isError && (
@@ -538,6 +584,7 @@ export function FileManager() {
 
         <ContextMenuContent className="min-w-48">
           {selection.length === 0 ? (
+            canAdd && (
             <>
               <ContextMenuItem onClick={() => createFolder.mutate()}>
                 <FolderPlus /> Neuer Ordner
@@ -546,6 +593,7 @@ export function FileManager() {
                 <Upload /> Dateien hochladen
               </ContextMenuItem>
             </>
+            )
           ) : (
             <>
               {single && (
@@ -556,24 +604,28 @@ export function FileManager() {
               <ContextMenuItem onClick={() => download(selection.map((node) => node.id))}>
                 <Download /> Herunterladen
               </ContextMenuItem>
-              {single && (
+              {single?.access === "owner" && (
                 <ContextMenuItem onClick={() => setSharing(single)}>
                   <Share2 /> Teilen
                 </ContextMenuItem>
               )}
-              <ContextMenuSeparator />
-              {single && (
-                <ContextMenuItem onClick={() => setRenaming(single.id)}>
-                  <PenLine /> Umbenennen
-                </ContextMenuItem>
+              {changeable && (
+                <>
+                  <ContextMenuSeparator />
+                  {single && (
+                    <ContextMenuItem onClick={() => setRenaming(single.id)}>
+                      <PenLine /> Umbenennen
+                    </ContextMenuItem>
+                  )}
+                  <ContextMenuItem onClick={() => setMoving(selection)}>
+                    <FolderInput /> Verschieben
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem variant="destructive" onClick={() => setDeleting(selection)}>
+                    <Trash2 /> Löschen
+                  </ContextMenuItem>
+                </>
               )}
-              <ContextMenuItem onClick={() => setMoving(selection)}>
-                <FolderInput /> Verschieben
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuItem variant="destructive" onClick={() => setDeleting(selection)}>
-                <Trash2 /> Löschen
-              </ContextMenuItem>
             </>
           )}
         </ContextMenuContent>

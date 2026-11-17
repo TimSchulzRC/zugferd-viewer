@@ -136,7 +136,7 @@ export function Users() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{removing?.email} entfernen?</AlertDialogTitle>
-            <AlertDialogDescription>Die Person kann sich danach nicht mehr anmelden. Ihre hochgeladenen Rechnungen bleiben erhalten.</AlertDialogDescription>
+            <AlertDialogDescription>Die Person kann sich danach nicht mehr anmelden. Ihre Ordner und Dateien gehen an dich über, in den Ordner „Von {removing?.email}“. Was sie mit anderen geteilt hat, bleibt geteilt.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Abbrechen</AlertDialogCancel>

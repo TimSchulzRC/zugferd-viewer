@@ -1,9 +1,9 @@
 import { downloadZip } from "client-zip";
 import { attachment, HttpError } from "./http";
-import { content, type tree } from "./nodes";
+import { content } from "./nodes";
 import { getObject } from "./storage";
 
-type Entries = Awaited<ReturnType<typeof tree>>;
+type Entries = { kind: "folder" | "file"; path: string; storage_key: string | null; updated_at: Date }[];
 
 /**
  * Files come from suppliers, so their content is untrusted. An XML file opened directly in the browser

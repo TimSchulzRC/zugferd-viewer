@@ -77,6 +77,7 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
   const pdfUrl = opened.data?.pdfUrl;
   useEffect(() => () => void (pdfUrl && URL.revokeObjectURL(pdfUrl)), [pdfUrl]);
 
+  const access = details.data?.node.access;
   const recheck = useMutation({
     mutationFn: () => (source.revalidate ? source.revalidate(id) : Promise.reject(new Error("Nicht verfügbar"))),
     onSuccess: (data) => queryClient.setQueryData([source.key, "file", id], data),
@@ -243,7 +244,7 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
           )}
         </PanelHeader>
         <div className="min-h-0 flex-1">
-          <ValidationPanel validation={validation} ruleset={ruleset} onRetry={source.revalidate ? () => recheck.mutate() : undefined} locate={locate} />
+          <ValidationPanel validation={validation} ruleset={ruleset} onRetry={source.revalidate && access !== "view" ? () => recheck.mutate() : undefined} locate={locate} />
         </div>
       </div>
     ),
@@ -258,7 +259,8 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
               <ArrowLeft />
             </Button>
           )}
-          {name && source.rename ? (
+          {/* Renaming changes the folder the file lies in, so it needs edit rights there (see requireChange in server/nodes.ts). */}
+          {name && source.rename && (access === "owner" || (access === "edit" && (details.data?.path.length ?? 0) > 0)) ? (
             <EditableName name={name} kind="file" onRename={(newName) => rename.mutate(newName)}>
               <p className="truncate text-sm font-medium">{name}</p>
             </EditableName>

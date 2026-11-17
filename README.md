@@ -7,7 +7,8 @@ Ablage und Prüfung für ZUGFeRD-, Factur-X- und XRechnung-Dateien (PDF oder XML
 - **Dateimanager.** Ordner in beliebiger Tiefe, Hochladen per Drag-and-drop (auch ganze Ordner), Umbenennen, Verschieben, Löschen, Mehrfachauswahl, Download einzeln oder als Zip. Rechtsklick öffnet das Kontextmenü.
 - **Viewer.** Links die PDF, daneben das eingebettete XML als aufbereitete Rechnung oder im Rohformat, rechts das Prüfergebnis mit den betroffenen BT-Codes. Ein Klick auf einen Befund markiert die Stelle im XML.
 - **Nutzer.** Anmeldung per E-Mail-Code oder Microsoft. Wer sich anmelden darf, bestimmen Administratoren per Einladung.
-- **Teilen.** Ordner oder einzelne Dateien für eine Person außerhalb freigeben, wahlweise mit Ablaufdatum. Siehe unten.
+- **Eigene Ablage.** Jeder Nutzer sieht nur seine eigenen Ordner und Dateien. Teilen lässt sich mit allen Nutzern oder ausgewählten, zum Ansehen oder Bearbeiten. Siehe unten.
+- **Teilen mit Externen.** Ordner oder einzelne Dateien für eine Person außerhalb freigeben, wahlweise mit Ablaufdatum. Siehe unten.
 
 ## Aufbau
 
@@ -18,7 +19,7 @@ Ablage und Prüfung für ZUGFeRD-, Factur-X- und XRechnung-Dateien (PDF oder XML
 | `postgres` | Nutzer, Sitzungen, Ordnerbaum, Prüfergebnisse |
 | S3 (extern) | die Dateien selbst |
 
-Der Ordnerbaum liegt in Postgres, in S3 liegt jede Datei unter einem zufälligen Schlüssel (`files/<uuid>`). Umbenennen und Verschieben ändern deshalb nur eine Zeile in der Datenbank. Alle Nutzer sehen dieselbe Ablage.
+Der Ordnerbaum liegt in Postgres, in S3 liegt jede Datei unter einem zufälligen Schlüssel (`files/<uuid>`). Umbenennen und Verschieben ändern deshalb nur eine Zeile in der Datenbank.
 
 Das Datenbankschema legt die App beim ersten Aufruf selbst an.
 
@@ -57,10 +58,40 @@ pnpm dev
 
 Ohne `LETTERMINT_TOKEN` verschickt die App keine Mails, sondern schreibt sie ins Server-Log. Dort steht dann auch der Anmeldecode. S3Mock vergisst seine Dateien beim Neustart.
 
+## Eigene Ablage und Teilen im Team
+
+Jeder Ordner und jede Datei gehört einer Person, nämlich der, der der oberste Ordner gehört. Andere sehen davon nichts, auch Administratoren nicht. Wer eine fremde ID errät, bekommt 404.
+
+Rechtsklick, „Teilen“, oben „Mit Nutzern dieser App teilen“: „Alle Nutzer“ oder eine Person wählen, dazu „Ansehen“ oder „Bearbeiten“. Eine Freigabe auf einem Ordner gilt für alles darin.
+
+| | Ansehen | Bearbeiten | Besitzer |
+| --- | --- | --- | --- |
+| Öffnen, herunterladen | ja | ja | ja |
+| Hochladen, Ordner anlegen, darin umbenennen, verschieben, löschen, erneut prüfen | | ja | ja |
+| Den geteilten Ordner selbst umbenennen, verschieben oder löschen | | | ja |
+| Weiter teilen, intern oder per Link | | | ja |
+
+- Geteiltes erscheint bei den anderen oben in „Rechnungen“, mit der Adresse der Besitzerin daneben. Was jemand in einen fremden Ordner hochlädt, gehört der Besitzerin des Ordners.
+- Verschieben geht nur innerhalb derselben Ablage. Wer etwas in einen fremden Ordner bringen will, lädt es dort hoch.
+- Entfernt ein Admin einen Nutzer, gehen dessen Ordner und Dateien an den Admin, in einen Ordner „Von <adresse>“. Freigaben, die der Nutzer gemacht hat, bleiben bestehen.
+- Beim Update auf diese Version gehört jeder vorhandene oberste Ordner samt Inhalt dem, der ihn angelegt hat (sonst `ADMIN_EMAIL`), und bleibt für alle zum Bearbeiten freigegeben. Was jemand in einen fremden Ordner geladen hatte, gehört wie bei neuen Dateien der Besitzerin des Ordners. So verliert niemand den Zugriff. Wer seinen Ordner für sich haben will, entfernt im Teilen-Dialog die Zeile „Alle Nutzer“.
+
+### Selbst prüfen
+
+Bei laufendem `pnpm dev` (ohne `LETTERMINT_TOKEN`, damit jeder Anmeldecode `000000` ist):
+
+```sh
+pnpm test:access                    # Adresse aus .env.local (PUBLIC_URL, sonst APP_URL)
+pnpm test:access http://host:3001   # oder ausdrücklich
+```
+
+Das Skript lädt die Demo-Nutzer `anna@demo.test`, `ben@demo.test` und `carla@demo.test` ein, baut über die echte API ein Szenario auf (privat, für alle zum Ansehen, für Ben zum Bearbeiten) und prüft gut 60 Fälle: wer was sieht, wer was ändern darf, fremde IDs, Ändern und Entfernen von Freigaben, Übergabe beim Löschen eines Nutzers. Danach bleibt das Szenario stehen; das Skript nennt am Ende, was jede Person beim Durchklicken sehen sollte. Jeder Lauf räumt die Demo-Daten des letzten Laufs vorher ab.
+
 ## Teilen mit Externen
 
 Rechtsklick auf einen Ordner oder eine Datei, „Teilen“, E-Mail-Adresse eintragen. Die Person bekommt einen Link per Mail. Öffnet sie ihn, schickt die App einen sechsstelligen Code an genau diese Adresse; erst der Code schaltet den Link in diesem Browser für 24 Stunden frei. Ein weitergeleiteter Link nützt deshalb niemandem ohne Zugriff auf das Postfach.
 
+- Links verschicken kann nur, wem der Ordner oder die Datei gehört.
 - Externe können ansehen (PDF, Rechnungsdaten, Prüfergebnis) und herunterladen. Ändern, verschieben, löschen, erneut prüfen oder weiter teilen können sie nichts; sie haben kein Konto und erreichen keine andere API als `/api/s/<token>`.
 - Ein Link sieht nur den freigegebenen Ordner und was darin liegt. Ein Link-Symbol in der Dateiliste zeigt, was geteilt ist, ein Klick darauf öffnet die Liste der Freigaben. Löschen beendet den Zugriff sofort.
 - Codes gelten 10 Minuten, einmal, mit höchstens 5 Versuchen; ein neuer Code geht frühestens nach einer Minute raus. Die Datenbank speichert Codes und Sitzungen nur als HMAC mit `BETTER_AUTH_SECRET`.

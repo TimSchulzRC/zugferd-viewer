@@ -1,4 +1,4 @@
 import { route } from "@/server/http";
 import { folders } from "@/server/nodes";
 
-export const GET = route(async () => folders());
+export const GET = route(async (_request, user) => folders(user.id));
