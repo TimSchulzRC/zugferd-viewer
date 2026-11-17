@@ -114,12 +114,12 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
       const byTerm = located ? null : [...doc.getElementsByTagName("*")].find((el) => finding.terms.includes(resolveTerm(el)?.id ?? ""));
       const element = located ?? byTerm ?? null;
       if (!element && !finding.terms.length) return null;
-      if (element) return { element: located, line: formatted.lineOf.get(element) };
-      // A term the file lacks has no line of its own. The raw view then goes where the prettified view
-      // marks it (the group the term belongs in, or the invoice header), at the first of those lines.
-      const highlight = highlightFor(invoice, null, finding.terms);
+      // The raw view goes to the first line the prettified view marks. The validator often names an
+      // ancestor instead of the field (BR-DE-17 points at the root, the finding is about BT-3), and a
+      // term the file lacks has no line of its own (then the group it belongs in, or the header, is marked).
+      const highlight = finding.terms.length ? highlightFor(invoice, located, finding.terms) : null;
       const lines = (highlight ? highlightedElements(invoice, highlight) : []).map((el) => formatted.lineOf.get(el)).filter((line) => line !== undefined);
-      return { element: null, line: lines.length ? Math.min(...lines) : undefined };
+      return { element: located, line: lines.length ? Math.min(...lines) : element ? formatted.lineOf.get(element) : undefined };
     },
     [doc, formatted, invoice],
   );
