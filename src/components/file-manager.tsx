@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, ChevronRight, CircleCheck, CircleX, Download, Eye, FileText, Folder, FolderInput, FolderPlus, PenLine, Share2, Trash2, TriangleAlert, Upload, Users, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, CircleCheck, CircleX, Download, Eye, FileText, Folder, FolderInput, FolderPlus, PenLine, Share2, Trash2, TriangleAlert, Upload, Users, X } from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -314,6 +314,12 @@ export function FileManager() {
       <header className="shrink-0 border-b">
         <div className="mx-auto flex h-12 w-full max-w-6xl items-center gap-2 px-3">
         <Logo className="size-6 shrink-0" />
+        {ordner !== null && (
+          // One level up. The path only shows folders you can open, so this never leads somewhere closed.
+          <Button variant="ghost" size="icon-sm" aria-label="Eine Ebene hoch" title="Eine Ebene hoch" onClick={() => setQuery({ ordner: crumbs.at(-2)?.id ?? null })}>
+            <ArrowLeft />
+          </Button>
+        )}
         <nav aria-label="Pfad" className="flex min-w-0 flex-1 items-center gap-0.5 text-sm">
           {crumbs.map((crumb, index) => {
             const last = index === crumbs.length - 1;
