@@ -66,7 +66,8 @@ function create() {
       // would let an admin open that person's files, which belong to them alone (see nodes.ts).
       admin({
         roles: {
-          admin: defaultAc.newRole({ user: ["list", "get", "set-role", "ban", "delete"], session: ["list", "revoke", "delete"] }),
+          // No session rights either: listing someone's sessions shows their tokens and IP addresses.
+          admin: defaultAc.newRole({ user: ["list", "get", "set-role", "ban", "delete"], session: [] }),
           user: userAc,
         },
       }),

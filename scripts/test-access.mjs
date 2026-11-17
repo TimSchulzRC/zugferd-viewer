@@ -313,7 +313,25 @@ heading("7. Admins sehen keine fremden Dateien, auch nicht über Umwege");
   check("Nutzerliste laden geht weiterhin", (await admin.fetch("/api/auth/admin/list-users?limit=5")).status === 200);
 }
 
-heading("8. Nutzer entfernen: der Admin übernimmt die Dateien");
+heading("8. Angriffe auf Pfade und Ordnerbaum");
+{
+  check("Datei »../../boese.xml« in Annas Ordner laden → abgelehnt", (await ben.upload(fuerBen.id, "../../boese.xml")).status === 400);
+  check("Datei »a\\b.xml« → abgelehnt", (await ben.upload(fuerBen.id, "a\\b.xml")).status === 400);
+  // Two moves at once must not leave A inside B inside A: that would hang every query that walks the tree.
+  const a = await must(await ben.folder(null, "Kreis A"), "Ordner anlegen");
+  const b = await must(await ben.folder(null, "Kreis B"), "Ordner anlegen");
+  const [ab, ba] = await Promise.all([ben.move([a.id], b.id), ben.move([b.id], a.id)]);
+  check("A in B und B in A gleichzeitig: nur eins klappt", [ab.status, ba.status].sort().join() === "200,400", `${ab.status}, ${ba.status}`);
+  const top = await ben.root();
+  check("Danach lädt die Ablage normal", top.status === 200 && names(top).filter((n) => n.startsWith("Kreis")).length === 1, names(top).join(", "));
+  await ben.remove(((await ben.root()).data.items ?? []).filter((n) => n.name.startsWith("Kreis")).map((n) => n.id));
+  check(
+    "Admin liest Annas Sitzungen (Tokens, IPs) → abgelehnt",
+    (await admin.fetch("/api/auth/admin/list-user-sessions", { method: "POST", json: { userId: people[ANNA] } })).status === 403,
+  );
+}
+
+heading("9. Nutzer entfernen: der Admin übernimmt die Dateien");
 {
   const doraFolder = await must(await dora.folder(null, "Dora Projekt"), "Ordner anlegen");
   await must(await dora.upload(doraFolder.id, "rechnung-dora.xml"), "Hochladen");

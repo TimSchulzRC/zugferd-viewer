@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "kysely";
-import { ACCEPTED, MAX_FILE_BYTES, type Access, type Crumb, type FileDetails, type Folder, type Listing, type Node } from "@/lib/nodes";
+import { ACCEPTED, MAX_FILE_BYTES, nameSchema, type Access, type Crumb, type FileDetails, type Folder, type Listing, type Node } from "@/lib/nodes";
 import { db } from "./db";
 import { HttpError } from "./http";
 import { deleteObjects, getObject, putObject } from "./storage";
@@ -32,6 +32,18 @@ type Row = {
 };
 
 const RANK: Record<Access, number> = { view: 1, edit: 2, owner: 3 };
+
+/**
+ * Every walk up or down the tree stops this deep. Folders never nest that far; the limit only matters
+ * if a cycle slipped in, which would otherwise keep a recursive query (and a connection) busy forever.
+ */
+export const MAX_DEPTH = sql.lit(256);
+
+/** A name as one path segment in a zip: never a separator, never "." or "..". Matches zipSegment in SQL. */
+export const zipSegmentSql = (column: string) => sql.raw(`(case when ${column} in ('.', '..') then '_' else translate(${column}, '/\\', '__') end)`);
+export function zipSegment(name: string) {
+  return name === "." || name === ".." ? "_" : name.replace(/[/\\]/g, "_");
+}
 const NOT_FOUND = "Nicht gefunden";
 
 function stronger(a: Access | null, b: Access | null): Access | null {
@@ -88,9 +100,9 @@ export async function accessTo(userId: string, id: string) {
   if (row.owner_id === userId) return { row, access: "owner" as Access };
   const { rows } = await sql<{ can_edit: boolean | null }>`
     with recursive up as (
-      select id, parent_id from node where id = ${id}
+      select id, parent_id, 0 as depth from node where id = ${id}
       union all
-      select n.id, n.parent_id from node n join up on n.id = up.parent_id
+      select n.id, n.parent_id, up.depth + 1 from node n join up on n.id = up.parent_id where up.depth < ${MAX_DEPTH}
     )
     select bool_or(permission.can_edit) as can_edit from up join permission on permission.node_id = up.id and ${forUser(userId)}
   `.execute(db());
@@ -141,7 +153,7 @@ export async function pathTo(id: string | null): Promise<Crumb[]> {
     with recursive up as (
       select id, parent_id, name, 0 as depth from node where id = ${id}
       union all
-      select n.id, n.parent_id, n.name, up.depth + 1 from node n join up on n.id = up.parent_id
+      select n.id, n.parent_id, n.name, up.depth + 1 from node n join up on n.id = up.parent_id where up.depth < ${MAX_DEPTH}
     )
     select id, name, depth from up order by depth desc
   `.execute(db());
@@ -195,9 +207,9 @@ async function top(userId: string): Promise<Node[]> {
     where n.owner_id <> ${userId}
       and not exists (
         with recursive up as (
-          select parent_id as id from node where id = n.id
+          select parent_id as id, 0 as depth from node where id = n.id
           union all
-          select m.parent_id from node m join up on m.id = up.id
+          select m.parent_id, up.depth + 1 from node m join up on m.id = up.id where up.depth < ${MAX_DEPTH}
         )
         select 1 from up join permission q on q.node_id = up.id and (q.user_id = ${userId} or q.user_id is null)
       )
@@ -307,17 +319,21 @@ async function check(bytes: Uint8Array, name: string) {
 export async function upload(userId: string, parentId: string | null, file: File): Promise<Node> {
   if (!ACCEPTED.test(file.name)) throw new HttpError(415, "Nur PDF- und XML-Dateien");
   if (file.size > MAX_FILE_BYTES) throw new HttpError(413, "Datei ist größer als 50 MB");
-  const { ownerId } = await target(userId, parentId);
+  // The same rules as for typed names: a name like "../x.xml" would become a path in a zip.
+  const name = nameSchema.parse(file.name);
+  await target(userId, parentId);
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const key = `files/${randomUUID()}`;
-  const [checked] = await Promise.all([check(bytes, file.name), putObject(key, bytes, file.type || "application/octet-stream")]);
+  const [checked] = await Promise.all([check(bytes, name), putObject(key, bytes, file.type || "application/octet-stream")]);
+  // Checked again after the slow part: access may have ended while the file was validated and stored.
+  const { ownerId } = await target(userId, parentId);
   const { id } = await db()
     .insertInto("node")
     .values({
       parent_id: parentId,
       kind: "file",
-      name: await freeName(parentId, ownerId, file.name),
+      name: await freeName(parentId, ownerId, name),
       size: bytes.byteLength,
       storage_key: key,
       status: checked.status,
@@ -339,6 +355,7 @@ export async function revalidate(userId: string, id: string): Promise<FileDetail
     console.error(`Validating ${row.name} failed`, error);
     throw new HttpError(502, "Validator nicht erreichbar");
   });
+  await requireAccess(userId, id, "edit");
   await db()
     .updateTable("node")
     .set({ report: JSON.stringify(report) as never, status: statusOf(report) })
@@ -362,19 +379,35 @@ export async function move(userId: string, ids: string[], parentId: string | nul
   const moved = await Promise.all(ids.map((id) => requireChange(userId, id)));
   const { ownerId } = await target(userId, parentId);
   if (moved.some((row) => row.owner_id !== ownerId)) throw new HttpError(400, "Verschieben geht nur innerhalb derselben Ablage");
-  // A folder cannot go into itself or one of its own subfolders.
-  const ancestors = new Set((await pathTo(parentId)).map((crumb) => crumb.id));
-  if (ids.some((id) => ancestors.has(id))) throw new HttpError(400, "Ein Ordner kann nicht in sich selbst verschoben werden");
-  await db().updateTable("node").set({ parent_id: parentId }).where("id", "in", ids).execute();
+  // Moves in one person's files take turns, and the check that a folder does not go into itself or
+  // one of its subfolders runs inside the turn. Two moves at once (A into B, B into A) would
+  // otherwise both pass the check and leave a cycle.
+  await db()
+    .transaction()
+    .execute(async (trx) => {
+      await sql`select pg_advisory_xact_lock(hashtext(${`move:${ownerId}`}))`.execute(trx);
+      const { rows: up } = await sql<{ id: string }>`
+        with recursive up as (
+          select id, parent_id, 0 as depth from node where id = ${parentId}
+          union all
+          select n.id, n.parent_id, up.depth + 1 from node n join up on n.id = up.parent_id where up.depth < ${MAX_DEPTH}
+        )
+        select id from up
+      `.execute(trx);
+      const ancestors = new Set(up.map((row) => row.id));
+      if (ids.some((id) => ancestors.has(id))) throw new HttpError(400, "Ein Ordner kann nicht in sich selbst verschoben werden");
+      await trx.updateTable("node").set({ parent_id: parentId }).where("id", "in", ids).execute();
+    });
 }
 
 /** Every file below the given nodes with its path relative to them, plus the folders (so empty ones survive a zip). */
 export async function tree(ids: string[]) {
   const { rows: found } = await sql<{ kind: "folder" | "file"; path: string; storage_key: string | null; updated_at: Date; start: string }>`
     with recursive down as (
-      select id, kind, name::text as path, storage_key, updated_at, id as start from node where id = any(${ids}::uuid[])
+      select id, kind, ${zipSegmentSql("name")}::text as path, storage_key, updated_at, id as start, 0 as depth from node where id = any(${ids}::uuid[])
       union all
-      select n.id, n.kind, down.path || '/' || n.name, n.storage_key, n.updated_at, down.start from node n join down on n.parent_id = down.id
+      select n.id, n.kind, down.path || '/' || ${zipSegmentSql("n.name")}, n.storage_key, n.updated_at, down.start, down.depth + 1
+        from node n join down on n.parent_id = down.id where down.depth < ${MAX_DEPTH}
     )
     select kind, path, storage_key, updated_at, start from down order by path
   `.execute(db());
@@ -387,7 +420,7 @@ export async function tree(ids: string[]) {
  */
 export async function treeFor(userId: string, ids: string[]) {
   const names = new Map<string, string>();
-  for (const id of ids) names.set(id, (await requireAccess(userId, id, "view")).row.name);
+  for (const id of ids) names.set(id, zipSegment((await requireAccess(userId, id, "view")).row.name));
   const taken = new Set<string>();
   const unique = new Map<string, string>();
   for (const [id, name] of names) {
@@ -395,7 +428,10 @@ export async function treeFor(userId: string, ids: string[]) {
     taken.add(free.toLowerCase());
     unique.set(id, free);
   }
-  return (await tree(ids)).map((entry) => ({ ...entry, path: unique.get(entry.start)! + entry.path.slice(names.get(entry.start)!.length) }));
+  const entries = await tree(ids);
+  // Checked again: a folder moved out of the user's reach meanwhile must not end up in the zip.
+  for (const id of ids) await requireAccess(userId, id, "view");
+  return entries.map((entry) => ({ ...entry, path: unique.get(entry.start)! + entry.path.slice(names.get(entry.start)!.length) }));
 }
 
 export async function remove(userId: string, ids: string[]) {
