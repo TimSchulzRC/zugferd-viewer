@@ -3,6 +3,13 @@ import { reportSchema } from "./report";
 
 /** Shapes shared by the API routes and the client. */
 
+/**
+ * What the signed-in user may do with a node. The owner does everything, "edit" lets others add,
+ * rename, move and delete inside a folder shared with them, "view" lets them look and download.
+ */
+export const accessSchema = z.enum(["owner", "edit", "view"]);
+export type Access = z.infer<typeof accessSchema>;
+
 export const nodeSchema = z.object({
   id: z.string(),
   parentId: z.string().nullable(),
@@ -11,21 +18,28 @@ export const nodeSchema = z.object({
   size: z.number().nullable(),
   status: z.enum(["einvoice", "valid", "invalid"]).nullable(),
   updatedAt: z.string(),
-  /** Whether a public link that has not expired points at this node. */
+  /** For the owner: whether this node is shared with colleagues or by a link that has not expired. */
   shared: z.boolean().default(false),
+  access: accessSchema.default("view"),
+  /** Who owns the node, so a move stays within one person's files. Empty for link visitors. */
+  ownerId: z.string().default(""),
+  /** The owner's address when that is someone else, shown next to what others shared with you. */
+  owner: z.string().nullable().default(null),
 });
 export type Node = z.infer<typeof nodeSchema>;
 
 const crumb = z.object({ id: z.string(), name: z.string() });
 export type Crumb = z.infer<typeof crumb>;
 
-export const listingSchema = z.object({ path: z.array(crumb), items: z.array(nodeSchema) });
+/** access is what the user may do in the listed folder; at the root that is always "owner". */
+export const listingSchema = z.object({ path: z.array(crumb), access: accessSchema.default("view"), items: z.array(nodeSchema) });
 export type Listing = z.infer<typeof listingSchema>;
 
 export const fileSchema = z.object({ node: nodeSchema, path: z.array(crumb), report: reportSchema.nullable() });
 export type FileDetails = z.infer<typeof fileSchema>;
 
-export const folderSchema = z.object({ id: z.string(), parentId: z.string().nullable(), name: z.string() });
+/** A folder the user may move things into. parentId is null for the top of what they can see. */
+export const folderSchema = z.object({ id: z.string(), parentId: z.string().nullable(), name: z.string(), ownerId: z.string(), owner: z.string().nullable() });
 export type Folder = z.infer<typeof folderSchema>;
 
 export const nameSchema = z
@@ -64,3 +78,18 @@ export const shareInfoSchema = z.discriminatedUnion("locked", [
   z.object({ locked: z.literal(false), kind: z.enum(["folder", "file"]), name: z.string(), rootId: z.string(), expiresOn: z.string().nullable() }),
 ]);
 export type ShareInfo = z.infer<typeof shareInfoSchema>;
+
+/** A colleague a node is shared with, or everyone (userId null). */
+export const permissionSchema = z.object({
+  id: z.string(),
+  userId: z.string().nullable(),
+  email: z.string().nullable(),
+  canEdit: z.boolean(),
+});
+export type Permission = z.infer<typeof permissionSchema>;
+
+export const newPermissionSchema = z.object({ userId: z.string().min(1).nullable(), canEdit: z.boolean() });
+
+/** The other people with an account, to pick from when sharing. */
+export const colleagueSchema = z.object({ id: z.string(), email: z.string() });
+export type Colleague = z.infer<typeof colleagueSchema>;

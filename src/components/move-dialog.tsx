@@ -18,12 +18,15 @@ export function MoveDialog({ nodes, rootName, onClose, onMove }: Props) {
 
   const moved = new Set(nodes.map((node) => node.id));
   const from = nodes[0]?.parentId ?? null;
+  // Moves stay within one person's files: your own, or the folder someone shared with you.
+  const ownerId = nodes[0]?.ownerId;
+  const own = nodes.every((node) => node.access === "owner");
   const children = (parentId: string | null) => (folders.data ?? []).filter((folder) => folder.parentId === parentId);
 
-  const row = (id: string | null, name: string, depth: number) => (
+  const row = (id: string | null, name: string, depth: number, allowed: boolean, owner?: string | null) => (
     <button
       type="button"
-      disabled={id === from}
+      disabled={id === from || !allowed}
       aria-pressed={target === id}
       onClick={() => setTarget(id)}
       onDoubleClick={() => onMove(id)}
@@ -32,6 +35,7 @@ export function MoveDialog({ nodes, rootName, onClose, onMove }: Props) {
     >
       <FolderIcon className="size-4 shrink-0" />
       <span className="truncate">{name}</span>
+      {owner && <span className="truncate text-xs opacity-70">{owner}</span>}
     </button>
   );
 
@@ -39,7 +43,7 @@ export function MoveDialog({ nodes, rootName, onClose, onMove }: Props) {
   const branch = (folder: Folder, depth: number): React.ReactNode =>
     moved.has(folder.id) ? null : (
       <li key={folder.id}>
-        {row(folder.id, folder.name, depth)}
+        {row(folder.id, folder.name, depth, folder.ownerId === ownerId, depth === 1 ? folder.owner : null)}
         <ul>{children(folder.id).map((child) => branch(child, depth + 1))}</ul>
       </li>
     );
@@ -52,7 +56,7 @@ export function MoveDialog({ nodes, rootName, onClose, onMove }: Props) {
         </DialogHeader>
         <ul className="max-h-80 overflow-auto rounded-lg border p-1">
           <li>
-            {row(null, rootName, 0)}
+            {row(null, rootName, 0, own)}
             <ul>{children(null).map((child) => branch(child, 1))}</ul>
           </li>
         </ul>

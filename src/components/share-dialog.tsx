@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Mail, Trash2 } from "lucide-react";
+import { Copy, Mail, Trash2, UserRound, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, shareUrl } from "@/lib/api";
-import type { Node, Share } from "@/lib/nodes";
+import type { Node, Permission, Share } from "@/lib/nodes";
 import { cn } from "@/lib/utils";
 
 const dayFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium" });
@@ -74,6 +74,106 @@ function ShareRow({ share, onDelete }: { share: Share; onDelete: () => void }) {
   );
 }
 
+const SELECT = "h-8 w-full min-w-0 rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+const EVERYONE = "*";
+
+function PermissionRow({ permission, onChange, onDelete }: { permission: Permission; onChange: (canEdit: boolean) => void; onDelete: () => void }) {
+  const label = permission.userId === null ? "Alle Nutzer" : permission.email;
+  return (
+    <li className="flex items-center gap-2 rounded-lg border p-2">
+      {permission.userId === null ? <Users className="size-4 shrink-0 text-muted-foreground" /> : <UserRound className="size-4 shrink-0 text-muted-foreground" />}
+      <p className="min-w-0 flex-1 truncate font-medium">{label}</p>
+      <select aria-label={`Rechte für ${label}`} className={cn(SELECT, "w-32")} value={permission.canEdit ? "edit" : "view"} onChange={(event) => onChange(event.target.value === "edit")}>
+        <option value="view">Ansehen</option>
+        <option value="edit">Bearbeiten</option>
+      </select>
+      <Button variant="ghost" size="icon-sm" aria-label={`Freigabe für ${label} beenden`} onClick={onDelete}>
+        <Trash2 />
+      </Button>
+    </li>
+  );
+}
+
+/** Sharing with people who have an account: everyone, or chosen colleagues, to view or to edit. */
+function Colleagues({ node }: { node: Node }) {
+  const queryClient = useQueryClient();
+  const permissions = useQuery({ queryKey: ["permissions", node.id], queryFn: () => api.permissions(node.id) });
+  const colleagues = useQuery({ queryKey: ["colleagues"], queryFn: api.colleagues });
+  const [who, setWho] = useState(EVERYONE);
+  const [level, setLevel] = useState<"view" | "edit">("view");
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["permissions", node.id] });
+    queryClient.invalidateQueries({ queryKey: ["nodes"] });
+  };
+  const grant = useMutation({
+    mutationFn: (input: { userId: string | null; canEdit: boolean }) => api.grant(node.id, input),
+    onSuccess: (permission) => {
+      refresh();
+      toast.success(`Geteilt mit ${permission.email ?? "allen Nutzern"}`);
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const revoke = useMutation({
+    mutationFn: (id: string) => api.revoke(id),
+    onSuccess: () => {
+      refresh();
+      toast.success("Freigabe beendet");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const taken = new Set(permissions.data?.map((permission) => permission.userId ?? EVERYONE));
+  const choices = [{ id: EVERYONE, email: "Alle Nutzer" }, ...(colleagues.data ?? [])].filter((choice) => !taken.has(choice.id));
+  const chosen = choices.some((choice) => choice.id === who) ? who : choices[0]?.id;
+
+  return (
+    <section className="flex flex-col gap-3">
+      <p className="font-medium">Mit Nutzern dieser App teilen</p>
+      {permissions.data && permissions.data.length > 0 && (
+        <ul className="flex max-h-56 flex-col gap-2 overflow-auto">
+          {permissions.data.map((permission) => (
+            <PermissionRow
+              key={permission.id}
+              permission={permission}
+              onChange={(canEdit) => grant.mutate({ userId: permission.userId, canEdit })}
+              onDelete={() => revoke.mutate(permission.id)}
+            />
+          ))}
+        </ul>
+      )}
+      {choices.length > 0 && (
+        <form
+          className="flex flex-wrap items-center gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (chosen) grant.mutate({ userId: chosen === EVERYONE ? null : chosen, canEdit: level === "edit" });
+          }}
+        >
+          <select aria-label="Mit wem teilen" className={cn(SELECT, "flex-1 basis-48")} value={chosen} onChange={(event) => setWho(event.target.value)}>
+            {choices.map((choice) => (
+              <option key={choice.id} value={choice.id}>
+                {choice.email}
+              </option>
+            ))}
+          </select>
+          <select aria-label="Rechte" className={cn(SELECT, "w-32")} value={level} onChange={(event) => setLevel(event.target.value as "view" | "edit")}>
+            <option value="view">Ansehen</option>
+            <option value="edit">Bearbeiten</option>
+          </select>
+          <Button type="submit" disabled={!chosen || grant.isPending}>
+            <Users /> Teilen
+          </Button>
+        </form>
+      )}
+      <p className="text-xs text-muted-foreground">
+        {node.kind === "folder" ? "Gilt für alles in diesem Ordner. " : ""}Ansehen heißt öffnen und herunterladen. Bearbeiten erlaubt außerdem Hochladen, Umbenennen, Verschieben und Löschen
+        {node.kind === "folder" ? " darin" : ""}. Teilen kann nur, wem es gehört.
+      </p>
+    </section>
+  );
+}
+
 export function ShareDialog({ node, onClose }: { node: Node; onClose: () => void }) {
   const queryClient = useQueryClient();
   const shares = useQuery({ queryKey: ["shares", node.id], queryFn: () => api.shares(node.id) });
@@ -107,45 +207,49 @@ export function ShareDialog({ node, onClose }: { node: Node; onClose: () => void
 
   return (
     <Dialog open onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>„{node.name}“ teilen</DialogTitle>
-          <DialogDescription>
-            Die Person bekommt einen Link per E-Mail. Beim Öffnen schicken wir ihr einen Code an genau diese Adresse, ein weitergeleiteter Link nützt also
-            niemandem. Sie kann {node.kind === "folder" ? "den Ordner mit allem darin" : "die Datei"} ansehen und herunterladen, aber nichts ändern.
-          </DialogDescription>
+          <DialogDescription>Ohne Freigabe siehst nur du {node.kind === "folder" ? "diesen Ordner" : "diese Datei"}.</DialogDescription>
         </DialogHeader>
 
-        {shares.data && shares.data.length > 0 && (
-          <ul className="flex max-h-64 flex-col gap-2 overflow-auto">
-            {shares.data.map((share) => (
-              <ShareRow key={share.id} share={share} onDelete={() => remove.mutate(share.id)} />
-            ))}
-          </ul>
-        )}
+        <Colleagues node={node} />
 
-        <form
-          className="flex flex-col gap-3 rounded-lg bg-muted/50 p-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            create.mutate();
-          }}
-        >
-          <p className="font-medium">Mit einer Person teilen</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="share-email">E-Mail-Adresse</Label>
-              <Input id="share-email" type="email" required value={email} autoComplete="off" onChange={(event) => setEmail(event.target.value)} />
+        <section className="flex flex-col gap-3 border-t pt-4">
+          <p className="font-medium">Mit einer Person außerhalb teilen</p>
+          <p className="text-xs text-muted-foreground">
+            Die Person bekommt einen Link per E-Mail. Beim Öffnen schicken wir ihr einen Code an genau diese Adresse, ein weitergeleiteter Link nützt also niemandem. Sie
+            kann {node.kind === "folder" ? "den Ordner mit allem darin" : "die Datei"} ansehen und herunterladen, aber nichts ändern.
+          </p>
+          {shares.data && shares.data.length > 0 && (
+            <ul className="flex max-h-48 flex-col gap-2 overflow-auto">
+              {shares.data.map((share) => (
+                <ShareRow key={share.id} share={share} onDelete={() => remove.mutate(share.id)} />
+              ))}
+            </ul>
+          )}
+          <form
+            className="flex flex-col gap-3 rounded-lg bg-muted/50 p-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              create.mutate();
+            }}
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="share-email">E-Mail-Adresse</Label>
+                <Input id="share-email" type="email" required value={email} autoComplete="off" onChange={(event) => setEmail(event.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="share-expires">Gültig bis (optional)</Label>
+                <Input id="share-expires" type="date" min={today()} value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} />
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="share-expires">Gültig bis (optional)</Label>
-              <Input id="share-expires" type="date" min={today()} value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} />
-            </div>
-          </div>
-          <Button type="submit" disabled={!email || create.isPending} className="self-end">
-            <Mail /> Teilen und Link senden
-          </Button>
-        </form>
+            <Button type="submit" disabled={!email || create.isPending} className="self-end">
+              <Mail /> Teilen und Link senden
+            </Button>
+          </form>
+        </section>
       </DialogContent>
     </Dialog>
   );

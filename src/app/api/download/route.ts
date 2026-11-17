@@ -1,8 +1,8 @@
 import { downloadResponse } from "@/server/download";
 import { idsParam, route } from "@/server/http";
-import { tree } from "@/server/nodes";
+import { treeFor } from "@/server/nodes";
 
-export const GET = route(async (request) => {
+export const GET = route(async (request, user) => {
   const ids = idsParam(request);
-  return downloadResponse(ids, await tree(ids));
+  return downloadResponse(ids, await treeFor(user.id, ids));
 });

@@ -8,9 +8,9 @@ const body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("delete"), ids }),
 ]);
 
-export const POST = route(async (request) => {
+export const POST = route(async (request, user) => {
   const input = body.parse(await request.json());
-  if (input.action === "move") await move(input.ids, input.parentId);
-  else await remove(input.ids);
+  if (input.action === "move") await move(user.id, input.ids, input.parentId);
+  else await remove(user.id, input.ids);
   return { ok: true };
 });

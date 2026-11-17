@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { fileSchema, folderSchema, listingSchema, nodeSchema, shareInfoSchema, shareSchema, type FileDetails } from "./nodes";
+import { colleagueSchema, fileSchema, folderSchema, listingSchema, nodeSchema, permissionSchema, shareInfoSchema, shareSchema, type FileDetails } from "./nodes";
 
 /**
  * Full page load on purpose: signing in or out must drop every cached query and re-run the
@@ -49,6 +49,10 @@ export const api = {
   shares: (nodeId: string) => request(z.array(shareSchema), `/api/nodes/${nodeId}/shares`),
   createShare: (nodeId: string, options: { email: string; expiresOn?: string | null }) => request(shareSchema, `/api/nodes/${nodeId}/shares`, json("POST", options)),
   deleteShare: (id: string) => request(ok, `/api/shares/${id}`, { method: "DELETE" }),
+  permissions: (nodeId: string) => request(z.array(permissionSchema), `/api/nodes/${nodeId}/permissions`),
+  grant: (nodeId: string, input: { userId: string | null; canEdit: boolean }) => request(permissionSchema, `/api/nodes/${nodeId}/permissions`, json("POST", input)),
+  revoke: (id: string) => request(ok, `/api/permissions/${id}`, { method: "DELETE" }),
+  colleagues: () => request(z.array(colleagueSchema), "/api/users"),
   invite: (email: string) => request(ok, "/api/users/invite", json("POST", { email })),
   upload: (parentId: string | null, file: File) => {
     const body = new FormData();

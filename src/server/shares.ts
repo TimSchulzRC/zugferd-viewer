@@ -6,7 +6,7 @@ import { db } from "./db";
 import { env } from "./env";
 import { HttpError } from "./http";
 import { sendShareCode, sendShareInvitation } from "./mail";
-import { children, content, details, find, pathTo } from "./nodes";
+import { children, content, details, find, pathTo, requireAccess } from "./nodes";
 
 /*
  * A share gives one outside person read access to a folder or file. The link alone is not enough:
@@ -79,14 +79,15 @@ function same(a: string, b: string) {
 
 /* Inside the app */
 
-export async function sharesOf(nodeId: string): Promise<Share[]> {
-  await find(nodeId);
+/** Only the owner sees and manages links. */
+export async function sharesOf(userId: string, nodeId: string): Promise<Share[]> {
+  await requireAccess(userId, nodeId, "owner");
   const rows = await shares().where("share.node_id", "=", nodeId).orderBy("share.created_at").execute();
   return rows.map(toShare);
 }
 
 export async function createShare(nodeId: string, options: { email: string; expiresOn?: string | null }, user: { id: string; name: string; email: string }): Promise<Share> {
-  const node = await find(nodeId);
+  const { row: node } = await requireAccess(user.id, nodeId, "owner");
   if (options.expiresOn) {
     // Same clock as the expiry check in shares(), so a link is never born expired.
     const { rows } = await sql<{ past: boolean }>`select ${options.expiresOn}::date < current_date as past`.execute(db());
@@ -108,7 +109,10 @@ export async function createShare(nodeId: string, options: { email: string; expi
   return toShare((await shares().where("share.id", "=", id).executeTakeFirstOrThrow()) as Row);
 }
 
-export async function deleteShare(id: string) {
+export async function deleteShare(userId: string, id: string) {
+  const share = await db().selectFrom("share").select("node_id").where("id", "=", id).executeTakeFirst();
+  if (!share) throw new HttpError(404, "Nicht gefunden");
+  await requireAccess(userId, share.node_id, "owner");
   const { numDeletedRows } = await db().deleteFrom("share").where("id", "=", id).executeTakeFirst();
   if (!numDeletedRows) throw new HttpError(404, "Nicht gefunden");
 }
@@ -226,7 +230,7 @@ export async function sharedList(share: Row, parentId: string | null): Promise<L
   if ((await find(folderId)).kind !== "folder") throw new HttpError(400, "Kein Ordner");
   const items = await children(folderId);
   // Whether something inside is shared again is the owner's business.
-  return { path, items: items.map((node) => ({ ...node, parentId: relativeParent(share, node), shared: false })) };
+  return { path, access: "view", items: items.map((node) => ({ ...node, parentId: relativeParent(share, node), shared: false })) };
 }
 
 export async function sharedDetails(share: Row, id: string): Promise<FileDetails> {
