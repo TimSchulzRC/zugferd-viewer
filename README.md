@@ -74,7 +74,7 @@ Rechtsklick, „Teilen“, oben „Mit Nutzern dieser App teilen“: „Alle Nut
 - Geteiltes erscheint bei den anderen oben in „Rechnungen“, mit der Adresse der Besitzerin daneben. Was jemand in einen fremden Ordner hochlädt, gehört der Besitzerin des Ordners.
 - Verschieben geht nur innerhalb derselben Ablage. Wer etwas in einen fremden Ordner bringen will, lädt es dort hoch.
 - Entfernt ein Admin einen Nutzer, gehen dessen Ordner und Dateien an den Admin, in einen Ordner „Von <adresse>“. Freigaben, die der Nutzer gemacht hat, bleiben bestehen.
-- Beim Update auf diese Version gehört alles Vorhandene dem, der es angelegt hat (sonst `ADMIN_EMAIL`), und bleibt für alle zum Bearbeiten freigegeben. So verliert niemand den Zugriff. Wer seinen Ordner für sich haben will, entfernt im Teilen-Dialog die Zeile „Alle Nutzer“.
+- Beim Update auf diese Version gehört jeder vorhandene oberste Ordner samt Inhalt dem, der ihn angelegt hat (sonst `ADMIN_EMAIL`), und bleibt für alle zum Bearbeiten freigegeben. Was jemand in einen fremden Ordner geladen hatte, gehört wie bei neuen Dateien der Besitzerin des Ordners. So verliert niemand den Zugriff. Wer seinen Ordner für sich haben will, entfernt im Teilen-Dialog die Zeile „Alle Nutzer“.
 
 ### Selbst prüfen
 
