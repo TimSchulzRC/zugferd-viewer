@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 /** Marks drags that started on a row, as opposed to files dragged in from the desktop. */
 const DRAG_TYPE = "application/x-zugferd-nodes";
 const ROOT_NAME = "Rechnungen";
+/** How far the pointer has to travel before a press on empty space becomes a selection rectangle. */
+const MARQUEE_THRESHOLD = 5;
 
 type SortKey = "name" | "status" | "size" | "updatedAt";
 const COLUMNS: { key: SortKey; label: string; className: string }[] = [
@@ -91,8 +93,12 @@ export function FileManager() {
   const [moving, setMoving] = useState<Node[] | null>(null);
   const [sharing, setSharing] = useState<Node | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [marquee, setMarquee] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
+  /** A press on empty space: where it started (in scroll content coordinates), what was selected before, where the pointer is now. */
+  const marqueeDrag = useRef<{ startX: number; startY: number; x: number; y: number; base: Set<string>; pointerX: number; pointerY: number; active: boolean } | null>(null);
+  const swallowClick = useRef(false);
 
   const [shownFolder, setShownFolder] = useState(ordner);
   if (shownFolder !== ordner) {
@@ -200,6 +206,91 @@ export function FileManager() {
     const listener = (event: KeyboardEvent) => keyHandler.current(event);
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
+  }, []);
+
+  const startMarquee = (event: React.PointerEvent) => {
+    // Touch scrolls the list; the rectangle is for the mouse. Names and controls keep their own drag and click.
+    if (event.pointerType !== "mouse" || event.button !== 0 || renaming) return;
+    if ((event.target as HTMLElement).closest("[draggable=true], button, input, [role=checkbox]")) return;
+    const container = list.current!;
+    const box = container.getBoundingClientRect();
+    marqueeDrag.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      x: event.clientX - box.left + container.scrollLeft,
+      y: event.clientY - box.top + container.scrollTop,
+      // Ctrl, Cmd and Shift add to the selection, as with clicks.
+      base: event.ctrlKey || event.metaKey || event.shiftKey ? new Set(selected) : new Set(),
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      active: false,
+    };
+  };
+
+  useEffect(() => {
+    let frame = 0;
+    // Runs every frame while the rectangle is up, so it also follows when the list scrolls under a still pointer.
+    const update = () => {
+      const drag = marqueeDrag.current;
+      const container = list.current;
+      if (!drag?.active || !container) return;
+      const box = container.getBoundingClientRect();
+      const edge = 40;
+      if (drag.pointerY < box.top + edge) container.scrollTop -= Math.ceil((box.top + edge - drag.pointerY) / 3);
+      else if (drag.pointerY > box.bottom - edge) container.scrollTop += Math.ceil((drag.pointerY - box.bottom + edge) / 3);
+
+      const x = Math.min(Math.max(drag.pointerX, box.left), box.right) - box.left + container.scrollLeft;
+      const y = Math.min(Math.max(drag.pointerY, box.top), box.bottom) - box.top + container.scrollTop;
+      const top = Math.min(y, drag.y);
+      const bottom = Math.max(y, drag.y);
+      setMarquee({ left: Math.min(x, drag.x), top, width: Math.abs(x - drag.x), height: bottom - top });
+
+      // Rows count by height only: it is a list, so a rectangle in the margin beside the rows still selects them.
+      const next = new Set(drag.base);
+      for (const row of container.querySelectorAll<HTMLElement>("[data-row]")) {
+        const rect = row.getBoundingClientRect();
+        const rowTop = rect.top - box.top + container.scrollTop;
+        if (rowTop < bottom && rowTop + rect.height > top) next.add(row.dataset.row!);
+      }
+      setSelected((current) => (current.size === next.size && [...next].every((id) => current.has(id)) ? current : next));
+      frame = requestAnimationFrame(update);
+    };
+    const move = (event: PointerEvent) => {
+      const drag = marqueeDrag.current;
+      if (!drag) return;
+      drag.pointerX = event.clientX;
+      drag.pointerY = event.clientY;
+      if (drag.active || Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < MARQUEE_THRESHOLD) return;
+      drag.active = true;
+      frame = requestAnimationFrame(update);
+    };
+    const end = (event: PointerEvent) => {
+      const drag = marqueeDrag.current;
+      if (drag?.active) {
+        // A quick drag can end before the next frame; count the rows up to where the pointer was released.
+        cancelAnimationFrame(frame);
+        if (event.type === "pointerup") {
+          drag.pointerX = event.clientX;
+          drag.pointerY = event.clientY;
+          update();
+          cancelAnimationFrame(frame);
+        }
+        setMarquee(null);
+        // The click that follows the release would open the row under the pointer or clear the selection.
+        swallowClick.current = true;
+        setTimeout(() => (swallowClick.current = false));
+      }
+      marqueeDrag.current = null;
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+    };
   }, []);
 
   /** Shared by folder rows, breadcrumbs and the list itself: accepts rows dragged within the app and files from outside. */
@@ -311,6 +402,12 @@ export function FileManager() {
           render={
             <div
               ref={list}
+              onPointerDown={startMarquee}
+              onClickCapture={(event) => {
+                if (!swallowClick.current) return;
+                swallowClick.current = false;
+                event.stopPropagation();
+              }}
               onClick={(event) => {
                 if (!(event.target as HTMLElement).closest("[data-row]")) setSelected(new Set());
               }}
@@ -318,23 +415,41 @@ export function FileManager() {
                 if (!(event.target as HTMLElement).closest("[data-row]")) setSelected(new Set());
               }}
               {...dropProps(ordner, "list")}
-              className={cn("min-h-0 flex-1 overflow-auto outline-none", dropTarget === "list" && "bg-primary/5 ring-2 ring-primary ring-inset")}
+              className={cn("relative min-h-0 flex-1 overflow-auto outline-none select-none", dropTarget === "list" && "bg-primary/5 ring-2 ring-primary ring-inset")}
             />
           }
         >
+          {marquee && <div aria-hidden className="pointer-events-none absolute z-20 rounded-sm border border-primary/60 bg-primary/10" style={marquee} />}
           <div className="@container mx-auto w-full max-w-6xl">
           <div role="row" className={cn(GRID, "sticky top-0 z-10 h-9 border-b bg-background text-xs text-muted-foreground")}>
-            {COLUMNS.map((column) => (
-              <button
-                key={column.key}
-                type="button"
-                onClick={() => setSort((current) => ({ key: column.key, descending: current.key === column.key && !current.descending }))}
-                className={cn("flex items-center gap-1 hover:text-foreground", column.className)}
-              >
-                {column.label}
-                {sort.key === column.key && (sort.descending ? <ArrowDown className="size-3" /> : <ArrowUp className="size-3" />)}
-              </button>
-            ))}
+            {COLUMNS.map((column) => {
+              const sortButton = (
+                <button
+                  key={column.key}
+                  type="button"
+                  onClick={() => setSort((current) => ({ key: column.key, descending: current.key === column.key && !current.descending }))}
+                  className={cn("flex items-center gap-1 hover:text-foreground", column.className)}
+                >
+                  {column.label}
+                  {sort.key === column.key && (sort.descending ? <ArrowDown className="size-3" /> : <ArrowUp className="size-3" />)}
+                </button>
+              );
+              if (column.key !== "name") return sortButton;
+              return (
+                <div key={column.key} className="flex min-w-0 items-center gap-2.5">
+                  <Checkbox
+                    checked={items.length > 0 && selection.length === items.length}
+                    indeterminate={selection.length > 0 && selection.length < items.length}
+                    disabled={!items.length}
+                    aria-label="Alle auswählen"
+                    // The list clears the selection on clicks outside rows.
+                    onClick={(event) => event.stopPropagation()}
+                    onCheckedChange={(checked) => setSelected(checked ? new Set(items.map((item) => item.id)) : new Set())}
+                  />
+                  {sortButton}
+                </div>
+              );
+            })}
           </div>
 
           {items.map((node) => {
@@ -347,7 +462,6 @@ export function FileManager() {
                 role="row"
                 data-row={node.id}
                 aria-selected={isSelected}
-                draggable={renaming !== node.id}
                 // A plain click opens; Ctrl, Cmd and Shift clicks select, as does the checkbox.
                 onClick={(event) => (event.shiftKey || event.metaKey || event.ctrlKey ? select(node, event) : open(node))}
                 onContextMenu={() => {
@@ -355,12 +469,6 @@ export function FileManager() {
                     setSelected(new Set([node.id]));
                     setAnchor(node.id);
                   }
-                }}
-                onDragStart={(event) => {
-                  const ids = isSelected ? [...selected] : [node.id];
-                  if (!isSelected) setSelected(new Set(ids));
-                  event.dataTransfer.setData(DRAG_TYPE, ids.join(","));
-                  event.dataTransfer.effectAllowed = "move";
                 }}
                 {...(node.kind === "folder" ? dropProps(node.id, key) : {})}
                 className={cn(
@@ -379,6 +487,17 @@ export function FileManager() {
                       select(node, { shiftKey: event.shiftKey, metaKey: true, ctrlKey: false });
                     }}
                   />
+                  {/* Dragging the icon or name moves the row; dragging anywhere else in the row draws a selection rectangle. */}
+                  <div
+                    draggable={renaming !== node.id}
+                    onDragStart={(event) => {
+                      const ids = isSelected ? [...selected] : [node.id];
+                      if (!isSelected) setSelected(new Set(ids));
+                      event.dataTransfer.setData(DRAG_TYPE, ids.join(","));
+                      event.dataTransfer.effectAllowed = "move";
+                    }}
+                    className={cn("flex min-w-0 items-center gap-2.5", renaming === node.id && "flex-1")}
+                  >
                   {node.kind === "folder" ? <Folder className="size-4 shrink-0 fill-sky-500/20 text-sky-600" /> : <FileText className="size-4 shrink-0 text-muted-foreground" />}
                   {renaming === node.id ? (
                     <RenameInput
@@ -391,6 +510,7 @@ export function FileManager() {
                   ) : (
                     <span className="truncate">{node.name}</span>
                   )}
+                  </div>
                   {node.shared && (
                     <button
                       type="button"
