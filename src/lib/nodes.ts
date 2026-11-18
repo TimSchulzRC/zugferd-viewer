@@ -17,6 +17,8 @@ export const nodeSchema = z.object({
   name: z.string(),
   size: z.number().nullable(),
   status: z.enum(["einvoice", "valid", "invalid"]).nullable(),
+  /** The profile id from the last validation, null for folders and files the validator could not read. */
+  profile: z.string().nullable().default(null),
   updatedAt: z.string(),
   /** For the owner: whether this node is shared with colleagues or by a link that has not expired. */
   shared: z.boolean().default(false),

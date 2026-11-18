@@ -43,7 +43,20 @@ export function describeProfile(id: string | null): Profile | null {
   return { name: id, en16931: false };
 }
 
-export const RULESETS = ["zugferd", "xrechnung"] as const;
+export type Format = "ZUGFeRD" | "XRechnung";
+
+/**
+ * Which standard a file follows, read from its profile. The XRechnung guideline id wins, also in a PDF
+ * that carries it. Profiles of neither (a Peppol UBL invoice, say) and files without one return null.
+ */
+export function formatOf(profile: string | null): Format | null {
+  if (!profile) return null;
+  if (/:kosit:(standard:)?xrechnung_\d/i.test(profile)) return "XRechnung";
+  if (/urn:(factur-x\.eu|zugferd\.de):\w+:\w+$|^urn:ferd:CrossIndustryDocument:/i.test(profile) || profile === "urn:cen.eu:en16931:2017") return "ZUGFeRD";
+  return null;
+}
+
+export const RULESETS =["zugferd", "xrechnung"] as const;
 export type Ruleset = (typeof RULESETS)[number];
 
 /** Rule ids of the XRechnung schematron: the German CIUS plus the Peppol rules it adopted. */

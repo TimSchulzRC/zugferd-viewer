@@ -16,6 +16,8 @@ import { statusOf, validate } from "./validate";
  */
 
 const COLUMNS = ["node.id", "node.parent_id", "node.kind", "node.name", "node.size", "node.status", "node.updated_at", "node.owner_id"] as const;
+/** Only the profile of the stored report, so listings don't load whole reports. */
+const PROFILE = sql<string | null>`node.report->>'profile'`.as("profile");
 type Row = {
   id: string;
   parent_id: string | null;
@@ -23,6 +25,7 @@ type Row = {
   name: string;
   size: number | string | null;
   status: Node["status"];
+  profile: string | null;
   updated_at: Date;
   owner_id: string;
   owner_email?: string | null;
@@ -65,6 +68,7 @@ export function toNode(row: Row): Node {
     name: row.name,
     size: row.size === null ? null : Number(row.size),
     status: row.status,
+    profile: row.profile,
     updatedAt: row.updated_at.toISOString(),
     shared: false,
     access: "view",
@@ -181,6 +185,7 @@ function rows(userId: string) {
     .selectFrom("node")
     .innerJoin("user as owner", "owner.id", "node.owner_id")
     .select(COLUMNS)
+    .select(PROFILE)
     .select("owner.email as owner_email")
     .select(
       sql<boolean>`exists (select 1 from share where share.node_id = node.id and (share.expires_on is null or share.expires_on >= current_date))
@@ -191,7 +196,7 @@ function rows(userId: string) {
 
 /** The children of a folder, for public links. */
 export async function children(parentId: string): Promise<Node[]> {
-  const found = await db().selectFrom("node").select(COLUMNS).where("parent_id", "=", parentId).execute();
+  const found = await db().selectFrom("node").select(COLUMNS).select(PROFILE).where("parent_id", "=", parentId).execute();
   return found.map(toNode);
 }
 
@@ -259,7 +264,7 @@ export async function folders(userId: string): Promise<Folder[]> {
 export async function details(id: string): Promise<FileDetails> {
   const row = await find(id);
   if (row.kind !== "file") throw new HttpError(400, "Kein Dokument");
-  return { node: toNode(row), path: await pathTo(row.parent_id), report: row.report };
+  return { node: toNode({ ...row, profile: row.report?.profile ?? null }), path: await pathTo(row.parent_id), report: row.report };
 }
 
 export async function fileFor(userId: string, id: string): Promise<FileDetails> {

@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { parseAsString, useQueryStates } from "nuqs";
 import { useMemo, useState } from "react";
 import { DEV_CODE } from "@/lib/dev";
-import { dateFormat, formatSize, STATUS } from "@/components/file-manager";
+import { dateFormat, FormatCell, formatSize, STATUS } from "@/components/file-manager";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,8 @@ import { ApiError, shareApi, shareSource } from "@/lib/api";
 import type { Node } from "@/lib/nodes";
 import { cn } from "@/lib/utils";
 
-const GRID = "grid grid-cols-[minmax(0,1fr)_9rem_5.5rem] @2xl:grid-cols-[minmax(0,1fr)_9rem_5.5rem_10rem] items-center gap-3 px-4";
+const GRID =
+  "grid grid-cols-[minmax(0,1fr)_9rem_5.5rem] @xl:grid-cols-[minmax(0,1fr)_5.5rem_9rem_5.5rem] @2xl:grid-cols-[minmax(0,1fr)_5.5rem_9rem_5.5rem_10rem] items-center gap-3 px-4";
 const dayFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "long" });
 
 function Centered({ children }: { children: React.ReactNode }) {
@@ -163,6 +164,7 @@ function SharedFolder({ token, name, rootId, expiresOn }: { token: string; name:
         <div className="@container mx-auto w-full max-w-6xl">
           <div role="row" className={cn(GRID, "sticky top-0 z-10 h-9 border-b bg-background text-xs text-muted-foreground")}>
             <span>Name</span>
+            <span className="hidden @xl:block">Format</span>
             <span>Prüfung</span>
             <span className="text-right">Größe</span>
             <span className="hidden @2xl:block">Geändert</span>
@@ -186,6 +188,7 @@ function SharedFolder({ token, name, rootId, expiresOn }: { token: string; name:
                     <Download className="size-4" />
                   </button>
                 </div>
+                <FormatCell node={node} />
                 <div className="flex items-center gap-1.5 whitespace-nowrap">
                   {status && (
                     <>

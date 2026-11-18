@@ -17,6 +17,7 @@ import { Logo } from "@/components/logo";
 import { UserMenu } from "@/components/user-menu";
 import { api, download } from "@/lib/api";
 import type { Node } from "@/lib/nodes";
+import { describeProfile, formatOf } from "@/lib/report";
 import { collectDropped, uploadAll, type Pending } from "@/lib/upload";
 import { cn } from "@/lib/utils";
 
@@ -26,15 +27,17 @@ const ROOT_NAME = "Rechnungen";
 /** How far the pointer has to travel before a press on empty space becomes a selection rectangle. */
 const MARQUEE_THRESHOLD = 5;
 
-type SortKey = "name" | "status" | "size" | "updatedAt";
+type SortKey = "name" | "format" | "status" | "size" | "updatedAt";
 const COLUMNS: { key: SortKey; label: string; className: string }[] = [
   { key: "name", label: "Name", className: "" },
+  { key: "format", label: "Format", className: "hidden @xl:flex" },
   { key: "status", label: "Prüfung", className: "" },
   { key: "size", label: "Größe", className: "justify-end text-right" },
   { key: "updatedAt", label: "Geändert", className: "hidden @2xl:flex" },
 ];
 // The last column holds the sharing button.
-const GRID = "grid grid-cols-[minmax(0,1fr)_9rem_5.5rem_1.5rem] @2xl:grid-cols-[minmax(0,1fr)_9rem_5.5rem_10rem_1.5rem] items-center gap-3 px-4";
+const GRID =
+  "grid grid-cols-[minmax(0,1fr)_9rem_5.5rem_1.5rem] @xl:grid-cols-[minmax(0,1fr)_5.5rem_9rem_5.5rem_1.5rem] @2xl:grid-cols-[minmax(0,1fr)_5.5rem_9rem_5.5rem_10rem_1.5rem] items-center gap-3 px-4";
 
 export const STATUS = {
   einvoice: { label: "E-Rechnung", icon: CircleCheck, color: "text-emerald-600" },
@@ -47,6 +50,16 @@ export const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium"
 export function formatSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024)).toLocaleString("de-DE")} kB`;
   return `${(bytes / 1024 / 1024).toLocaleString("de-DE", { maximumFractionDigits: 1 })} MB`;
+}
+
+/** ZUGFeRD or XRechnung, with the exact profile on hover. Hidden where the list is narrow, like its header. */
+export function FormatCell({ node }: { node: Node }) {
+  const format = formatOf(node.profile);
+  return (
+    <div className="hidden whitespace-nowrap @xl:block" title={describeProfile(node.profile)?.name}>
+      {node.kind === "file" && (format ?? <span className="text-muted-foreground">–</span>)}
+    </div>
+  );
 }
 
 export function FileManager() {
@@ -85,6 +98,7 @@ export function FileManager() {
       const byName = a.name.localeCompare(b.name, "de", { numeric: true, sensitivity: "base" });
       if (sort.key === "size") return ((a.size ?? 0) - (b.size ?? 0)) * direction || byName;
       if (sort.key === "updatedAt") return a.updatedAt.localeCompare(b.updatedAt) * direction || byName;
+      if (sort.key === "format") return (formatOf(a.profile) ?? "").localeCompare(formatOf(b.profile) ?? "") * direction || byName;
       if (sort.key === "status") return (a.status ?? "").localeCompare(b.status ?? "") * direction || byName;
       return byName * direction;
     };
@@ -519,6 +533,7 @@ export function FileManager() {
                   )}
                   </div>
                 </div>
+                <FormatCell node={node} />
                 <div className="flex items-center gap-1.5 whitespace-nowrap">
                   {status && (
                     <>
