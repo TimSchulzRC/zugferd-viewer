@@ -38,9 +38,15 @@ const CODE_ATTEMPTS = 5;
 const RESEND_SECONDS = 60;
 /** How long a confirmed browser keeps access before it needs a new code. */
 const SESSION_HOURS = 24;
-/** What one link may upload in 24 hours, so a leaked mailbox cannot fill the storage. */
+/**
+ * What a link's uploads from the last 24 hours may add up to while they are still there, so a leaked
+ * mailbox cannot fill the storage. Files the owner deleted no longer take up space and no longer count.
+ */
 const UPLOAD_FILES_PER_DAY = 200;
 const UPLOAD_BYTES_PER_DAY = 1024 * 1024 * 1024;
+/** Uploads one link may run at once. Each holds its file in memory, so this bounds what a link costs. Matches the browser's PARALLEL. */
+const UPLOADS_AT_ONCE = 3;
+const running = new Map<string, number>();
 
 /** Every query reads the date as text, because pg turns a date column into a Date at local midnight. */
 function shares() {
@@ -322,6 +328,22 @@ async function uploadCheck(executor: ReturnType<typeof db>, shareId: string, fol
     throw new HttpError(429, "Über diesen Link wurde heute schon zu viel hochgeladen. Bitte morgen weitermachen.");
   }
   return folder.owner_id;
+}
+
+/** Runs one upload through the link, or refuses when the link already has UPLOADS_AT_ONCE running. */
+export async function inTurn<T>(share: Row, work: () => Promise<T>): Promise<T> {
+  // Read-only links stop here, before anyone reads the request body.
+  if (!share.can_upload) throw new HttpError(403, "Hochladen ist für diesen Link nicht freigegeben");
+  const count = running.get(share.id) ?? 0;
+  if (count >= UPLOADS_AT_ONCE) throw new HttpError(429, "Zu viele Uploads gleichzeitig. Bitte kurz warten.");
+  running.set(share.id, count + 1);
+  try {
+    return await work();
+  } finally {
+    const left = running.get(share.id)! - 1;
+    if (left) running.set(share.id, left);
+    else running.delete(share.id);
+  }
 }
 
 /** A visitor uploads a file into the shared folder or a folder inside it. */

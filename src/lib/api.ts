@@ -55,15 +55,13 @@ export const api = {
   revoke: (id: string) => request(ok, `/api/permissions/${id}`, { method: "DELETE" }),
   colleagues: () => request(z.array(colleagueSchema), "/api/users"),
   invite: (email: string) => request(ok, "/api/users/invite", json("POST", { email })),
-  upload: (parentId: string | null, file: File) => request(nodeSchema, "/api/nodes/upload", uploadBody(parentId, file)),
+  upload: (parentId: string | null, file: File) => {
+    const body = new FormData();
+    body.set("file", file);
+    if (parentId) body.set("parentId", parentId);
+    return request(nodeSchema, "/api/nodes/upload", { method: "POST", body });
+  },
 };
-
-function uploadBody(parentId: string | null, file: File): RequestInit {
-  const body = new FormData();
-  body.set("file", file);
-  if (parentId) body.set("parentId", parentId);
-  return { method: "POST", body };
-}
 
 /** Starts a browser download: the file itself for one file, a zip for several or for folders. */
 export function download(ids: string[], base = "/api") {
@@ -84,7 +82,8 @@ export function shareApi(token: string) {
     list: (parentId: string | null) => request(listingSchema, `${base}/nodes${parentId ? `?parent=${parentId}` : ""}`, undefined, false),
     file: (id: string) => request(fileSchema, `${base}/nodes/${id}`, undefined, false),
     /** Only works when the owner allowed uploads for this link; the server checks. */
-    upload: (parentId: string | null, file: File) => request(nodeSchema, `${base}/upload`, uploadBody(parentId, file), false),
+    upload: (parentId: string | null, file: File) =>
+      request(nodeSchema, `${base}/upload${parentId ? `?parent=${parentId}` : ""}`, { method: "POST", headers: { "X-File-Name": encodeURIComponent(file.name) }, body: file }, false),
   };
 }
 

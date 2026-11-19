@@ -43,9 +43,9 @@ class Session {
     this.cookies = new Map();
   }
 
-  async fetch(path, { method = "GET", json, form } = {}) {
-    const headers = { origin: BASE, cookie: [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; ") };
-    let body;
+  async fetch(path, { method = "GET", json, form, body: raw, headers: extra = {} } = {}) {
+    const headers = { origin: BASE, cookie: [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; "), ...extra };
+    let body = raw;
     if (json !== undefined) {
       headers["content-type"] = "application/json";
       body = JSON.stringify(json);
@@ -158,24 +158,31 @@ class Visitor extends Session {
   list(parentId) {
     return this.fetch(`${this.base}/nodes${parentId ? `?parent=${parentId}` : ""}`);
   }
-  upload(parentId, name, content = invoice(name)) {
-    const form = new FormData();
-    form.set("file", new File([content], name));
-    if (parentId) form.set("parentId", parentId);
-    return this.fetch(`${this.base}/upload`, { method: "POST", form });
+  upload(parentId, name, content = invoice(name), headers = {}) {
+    return this.fetch(`${this.base}/upload${parentId ? `?parent=${encodeURIComponent(parentId)}` : ""}`, {
+      method: "POST",
+      body: content,
+      headers: { "x-file-name": encodeURIComponent(name), ...headers },
+    });
   }
-  /** A request the browser would never send: chunked without a length, or a length far too big. */
+  /**
+   * A request the browser would never send: chunked without a length, or a length far too big. It
+   * stays open until the server answers or release() is called, so it can also hold an upload slot.
+   */
   raw(headers, body) {
-    return new Promise((resolve) => {
-      const cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; ");
-      const request = httpRequest(BASE + `${this.base}/upload`, { method: "POST", headers: { origin: BASE, cookie, "content-type": "multipart/form-data; boundary=x", ...headers } }, (response) => {
+    const cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; ");
+    let request;
+    const status = new Promise((resolve) => {
+      request = httpRequest(BASE + `${this.base}/upload`, { method: "POST", headers: { origin: BASE, cookie, "x-file-name": "offen.txt", ...headers } }, (response) => {
         response.resume();
         resolve(response.statusCode);
       });
       request.on("error", () => resolve("abgebrochen"));
+      request.setTimeout(10_000, () => request.destroy());
       request.write(body);
       if (headers["transfer-encoding"]) request.end();
     });
+    return Object.assign(status, { release: () => request.destroy() });
   }
 }
 
@@ -421,26 +428,23 @@ heading("9. Personen außerhalb laden über einen Link hoch");
   check("Name »../../boese.xml« → 400", ...statusIs(await visitor.upload(null, "../../boese.xml"), 400));
   check("Binärdatei → 415", ...statusIs(await visitor.upload(null, "programm.exe", new Uint8Array([0x4d, 0x5a, 0, 0, 1, 2, 0, 0])), 415));
   check("Ohne eingegebenen Code → 403", ...statusIs(await stranger.upload(null, "ohne-code.xml"), 403));
-  const forged = await visitor.fetch(`${visitor.base}/upload`, { method: "POST", form: new FormData() });
-  check("Leere Anfrage → 400", ...statusIs(forged, 400));
+  check("Ohne Dateinamen → 400", ...statusIs(await visitor.fetch(`${visitor.base}/upload`, { method: "POST", body: "x" }), 400));
+  check("Kaputt kodierter Dateiname → 400", ...statusIs(await visitor.upload(null, "x", "x", { "x-file-name": "%E0%A4%A" }), 400));
   const csrf = await fetch(BASE + `${visitor.base}/upload`, {
     method: "POST",
-    headers: { origin: "https://boese.example", cookie: [...visitor.cookies].map(([k, v]) => `${k}=${v}`).join("; ") },
-    body: (() => {
-      const form = new FormData();
-      form.set("file", new File([invoice("csrf")], "csrf.xml"));
-      return form;
-    })(),
+    headers: { origin: "https://boese.example", "x-file-name": "csrf.xml", cookie: [...visitor.cookies].map(([k, v]) => `${k}=${v}`).join("; ") },
+    body: invoice("csrf"),
   });
   check("Von einer fremden Seite abgeschickt → 403", ...statusIs({ status: csrf.status }, 403));
-  check("Ohne Längenangabe (chunked) → 411", ...statusIs({ status: await visitor.raw({ "transfer-encoding": "chunked" }, "--x--") }, 411));
-  check("Längenangabe über 50 MB → 413, bevor gelesen wird", ...statusIs({ status: await visitor.raw({ "content-length": String(200 * 1024 * 1024) }, "--x") }, 413));
+  check("Ohne Längenangabe (chunked) → 411", ...statusIs({ status: await visitor.raw({ "transfer-encoding": "chunked" }, "abc") }, 411));
+  check("Längenangabe über 50 MB → 413, bevor gelesen wird", ...statusIs({ status: await visitor.raw({ "content-length": String(200 * 1024 * 1024) }, "abc") }, 413));
   check("Löschen über die App-API → 401", ...statusIs(await visitor.remove([vorhanden.id]), 401));
 
   await must(await anna.move([raus.id], privat.id), "Ordner aus dem Link verschieben");
   check("Ordner aus dem Link verschoben: dorthin → 404", ...statusIs(await visitor.upload(raus.id, "zu-spaet.xml"), 404));
   await must(await anna.allowUpload(link.id, false), "Hochladen beenden");
   check("Anna nimmt die Erlaubnis zurück: Hochladen → 403", ...statusIs(await visitor.upload(null, "zu-spaet.xml"), 403));
+  check("Ohne Erlaubnis und 40 MB angekündigt → 403, bevor gelesen wird", ...statusIs({ status: await visitor.raw({ "content-length": String(40 * 1024 * 1024) }, "abc") }, 403));
   check("Ansehen geht weiterhin", (await visitor.list(null)).status === 200);
   await must(await anna.deleteLink(link.id), "Link löschen");
   check("Link gelöscht: Hochladen → 404", ...statusIs(await visitor.upload(null, "zu-spaet.xml"), 404));
@@ -452,13 +456,21 @@ heading("9. Personen außerhalb laden über einen Link hoch");
   const flutLink = await must(await anna.createLink(flut.id, "flut@demo.test"), "Link anlegen");
   await must(await anna.allowUpload(flutLink.id, true), "Hochladen erlauben");
   const flooder = await new Visitor(flutLink.token).unlock();
+  // Three uploads that announce 1 kB and send 3 bytes hold their slots until released.
+  const held = Array.from({ length: 3 }, () => flooder.raw({ "content-length": "1024" }, "abc"));
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  check("3 Uploads laufen: der vierte → 429", ...statusIs(await flooder.upload(null, "vierter.txt", "x"), 429));
+  for (const request of held) request.release();
+  await Promise.all(held);
+  check("Abgebrochene Uploads geben ihren Platz frei", ...statusIs(await flooder.upload(null, "danach.txt", "x"), 200));
   const statuses = [];
-  for (let batch = 0; batch < 11; batch++) {
-    const results = await Promise.all(Array.from({ length: 20 }, (_, i) => flooder.upload(null, `flut-${batch}-${i}.txt`, "x")));
+  for (let batch = 0; batch < 80; batch++) {
+    const results = await Promise.all(Array.from({ length: 3 }, (_, i) => flooder.upload(null, `flut-${batch}-${i}.txt`, "x")));
     statuses.push(...results.map((r) => r.status));
   }
-  const accepted = statuses.filter((status) => status === 200).length;
-  check("220 Dateien, 20 gleichzeitig: genau 200 kommen an, der Rest → 429", accepted === 200 && statuses.filter((s) => s === 429).length === 20, `${accepted} angekommen`);
+  // »danach.txt« is the first of the 200.
+  const accepted = 1 + statuses.filter((status) => status === 200).length;
+  check("240 weitere Dateien, je 3 gleichzeitig: insgesamt genau 200 kommen an, der Rest → 429", accepted === 200 && statuses.every((s) => s === 200 || s === 429), `${accepted} angekommen`);
   await anna.remove([flut.id]);
 }
 
