@@ -1,5 +1,6 @@
 import { Kysely, PostgresDialect, sql, type Generated } from "kysely";
 import { Pool } from "pg";
+import type { FileType } from "@/lib/file-type";
 import type { Report } from "@/lib/report";
 import { env } from "./env";
 
@@ -12,6 +13,8 @@ type NodeTable = {
   name: string;
   size: number | null;
   storage_key: string | null;
+  /** Null for folders and for files from before other types than invoices could be uploaded. */
+  type: FileType | null;
   status: NodeStatus | null;
   report: Report | null;
   created_by: string | null;
@@ -81,6 +84,7 @@ export async function migrateAppTables(adminEmail: string) {
     )
   `.execute(db());
   await sql`create index if not exists node_parent on node (parent_id)`.execute(db());
+  await sql`alter table node add column if not exists type text`.execute(db());
   // Links to a folder or file for one outside person, who proves with a mailed code that the link
   // reached them. Deleting the node deletes its links.
   await sql`

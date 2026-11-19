@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 import { api } from "./api";
-import { ACCEPTED } from "./nodes";
+import { decodeText, isPdf } from "./file-type";
 
 /** A file waiting to be uploaded and the folders (relative to the drop target) it belongs in. */
 export type Pending = { file: File; dirs: string[] };
@@ -36,11 +36,18 @@ export async function collectDropped(data: DataTransfer): Promise<Pending[]> {
 
 const PARALLEL = 3;
 
-/** Recreates the dropped folder structure below parentId, uploads the invoices and reports progress as a toast. */
+/** PDFs and anything that reads as text. The server decides again, this only spares the upload. */
+async function showable(file: File) {
+  const head = new Uint8Array(await file.slice(0, 8192).arrayBuffer());
+  return isPdf(head) || decodeText(head) !== null;
+}
+
+/** Recreates the dropped folder structure below parentId, uploads the files and reports progress as a toast. */
 export async function uploadAll(parentId: string | null, pending: Pending[]) {
-  const accepted = pending.filter(({ file }) => ACCEPTED.test(file.name));
+  const checked = await Promise.all(pending.map(({ file }) => showable(file).catch(() => false)));
+  const accepted = pending.filter((_, index) => checked[index]);
   const skipped = pending.length - accepted.length;
-  if (skipped) toast.warning(skipped === 1 ? "1 Datei übersprungen, sie ist weder PDF noch XML" : `${skipped} Dateien übersprungen, sie sind weder PDF noch XML`);
+  if (skipped) toast.warning(skipped === 1 ? "1 Datei übersprungen, sie ist weder PDF noch Text" : `${skipped} Dateien übersprungen, sie sind weder PDF noch Text`);
   if (!accepted.length) return;
 
   const id = toast.loading(`0 von ${accepted.length} hochgeladen`);

@@ -6,6 +6,7 @@ Ablage und Prüfung für ZUGFeRD-, Factur-X- und XRechnung-Dateien (PDF oder XML
 
 - **Dateimanager.** Ordner in beliebiger Tiefe, Hochladen per Drag-and-drop (auch ganze Ordner), Umbenennen, Verschieben, Löschen, Mehrfachauswahl, Download einzeln oder als Zip. Rechtsklick öffnet das Kontextmenü.
 - **Viewer.** Links die PDF, daneben das eingebettete XML als aufbereitete Rechnung oder im Rohformat, rechts das Prüfergebnis mit den betroffenen BT-Codes. Ein Klick auf einen Befund markiert die Stelle im XML.
+- **IDocs und andere Textdateien.** Neben Rechnungen nimmt die Ablage jede Textdatei an, etwa die Quellnachricht, aus der ein Mapping die Rechnung erzeugt hat. Siehe unten.
 - **Nutzer.** Anmeldung per E-Mail-Code oder Microsoft. Wer sich anmelden darf, bestimmen Administratoren per Einladung.
 - **Eigene Ablage.** Jeder Nutzer sieht nur seine eigenen Ordner und Dateien. Teilen lässt sich mit allen Nutzern oder ausgewählten, zum Ansehen oder Bearbeiten. Siehe unten.
 - **Teilen mit Externen.** Ordner oder einzelne Dateien für eine Person außerhalb freigeben, wahlweise mit Ablaufdatum. Siehe unten.
@@ -86,6 +87,29 @@ pnpm test:access http://host:3001   # oder ausdrücklich
 ```
 
 Das Skript lädt die Demo-Nutzer `anna@demo.test`, `ben@demo.test` und `carla@demo.test` ein, baut über die echte API ein Szenario auf (privat, für alle zum Ansehen, für Ben zum Bearbeiten) und prüft gut 60 Fälle: wer was sieht, wer was ändern darf, fremde IDs, Ändern und Entfernen von Freigaben, Übergabe beim Löschen eines Nutzers. Danach bleibt das Szenario stehen; das Skript nennt am Ende, was jede Person beim Durchklicken sehen sollte. Jeder Lauf räumt die Demo-Daten des letzten Laufs vorher ab.
+
+## IDocs und andere Textdateien
+
+Was eine Datei ist, liest die App aus dem Inhalt, nicht aus der Endung. IDocs kommen als `.txt`, `.idoc`, `.dat` oder ganz ohne Endung. Geprüft werden nur Rechnungen (PDF, CII- und UBL-XML). Binärdateien außer PDF lehnt der Upload ab.
+
+| Erkannt als | Ansicht |
+| --- | --- |
+| IDoc (Flatfile oder XML) | Aufbereitet nach Segmenten, oder roh |
+| EDIFACT | Ein Segment je Zeile |
+| JSON | Eingerückt |
+| CSV | Als Tabelle, oder roh mit Spalten in wechselnden Farben |
+| XML, das keine Rechnung ist | Eingerückt |
+| Alles andere | Text |
+
+Ein Flatfile-IDoc hat keine Trennzeichen, jedes Feld steht an einer festen Stelle seines Segments. Die Feldlängen der Segmente von INVOIC02 stehen in `src/lib/idoc-segments.json`, die deutschen Namen in `src/lib/idoc-terms.ts`. Die Rohansicht färbt die Felder abwechselnd ein und nennt beim Überfahren den Feldnamen. Kundeneigene Segmente (`Z…`) zeigt die App ungeteilt.
+
+Weitere IDoc-Typen kommen aus einer BIC-Nachrichtenbeschreibung des Mapping Designers dazu:
+
+```sh
+node scripts/generate-idoc-segments.mjs msg_INVOIC02.xml msg_DESADV.xml
+```
+
+Das Skript schreibt die Datei neu, also immer alle Beschreibungen angeben.
 
 ## Teilen mit Externen
 

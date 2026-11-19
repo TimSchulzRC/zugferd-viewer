@@ -11,11 +11,16 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserMenu } from "@/components/user-menu";
 import { ValidationPanel, type Validation } from "@/components/validation-panel";
+import { CodeView } from "@/components/code-view";
+import { CsvTable } from "@/components/csv-table";
+import { IdocPretty } from "@/components/idoc-pretty";
 import { XmlPretty } from "@/components/xml-pretty";
-import { XmlRaw } from "@/components/xml-raw";
 import { ownSource, type Source } from "@/lib/api";
 import { buildInvoice, findElement, highlightedElements, highlightFor, resolveTerm } from "@/lib/cii";
-import { openFile } from "@/lib/open-file";
+import { FILE_TYPE_LABELS, type FileType } from "@/lib/file-type";
+import { highlight, MAX_LINES } from "@/lib/highlight";
+import { parseIdoc, parseXmlIdoc } from "@/lib/idoc";
+import { openFile, type OpenedFile } from "@/lib/open-file";
 import { describeProfile, type Finding, offersXRechnung, reportFor, RULESETS } from "@/lib/report";
 import { parseLocation } from "@/lib/terms";
 import { cn } from "@/lib/utils";
@@ -24,6 +29,7 @@ import { formatXml } from "@/lib/xml-format";
 const PANELS = ["pdf", "xml", "check"] as const;
 type PanelId = (typeof PANELS)[number];
 const VIEWS = ["aufbereitet", "roh"] as const;
+type View = (typeof VIEWS)[number];
 
 type Focus = { finding: Finding; element: Element | null; line: number | undefined };
 
@@ -38,6 +44,31 @@ function PanelHeader({ title, children }: { title: string; children?: React.Reac
 
 function Empty({ children }: { children: React.ReactNode }) {
   return <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">{children}</div>;
+}
+
+const TRUNCATED = `Nur die ersten ${MAX_LINES.toLocaleString("de-DE")} Zeilen. Die ganze Datei gibt es als Download.`;
+
+/** Every file that is not an invoice: as text with colours, an IDoc also laid out by segments, CSV also as a table. */
+function TextPanel({ file, type, view, onView }: { file: OpenedFile; type: Exclude<FileType, "invoice">; view: View; onView: (view: View) => void }) {
+  const { text, doc } = file;
+  const idoc = useMemo(() => (type !== "idoc" ? null : doc ? parseXmlIdoc(doc) : text && !file.xml ? parseIdoc(text) : null), [type, doc, text, file.xml]);
+  const raw = useMemo(() => (doc ? { lines: formatXml(doc).lines, truncated: false } : highlight(text ?? "", type, idoc)), [doc, text, type, idoc]);
+  const pretty = idoc ? <IdocPretty file={idoc} /> : type === "csv" && text ? <CsvTable text={text} /> : null;
+  return (
+    <div className="flex h-full flex-col">
+      <PanelHeader title={FILE_TYPE_LABELS[type]}>
+        {pretty && (
+          <Tabs value={view} onValueChange={(next) => onView(next as View)}>
+            <TabsList className="h-7">
+              <TabsTrigger value="aufbereitet">Aufbereitet</TabsTrigger>
+              <TabsTrigger value="roh">Roh</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
+      </PanelHeader>
+      <div className="min-h-0 flex-1">{pretty && view === "aufbereitet" ? pretty : <CodeView lines={raw.lines} note={raw.truncated ? TRUNCATED : undefined} />}</div>
+    </div>
+  );
 }
 
 type Props = {
@@ -63,6 +94,7 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
 
   const details = useQuery({ queryKey: [source.key, "file", id], queryFn: () => source.file(id) });
   const name = details.data?.node.name;
+  const type = details.data?.node.type ?? "invoice";
   const opened = useQuery({
     queryKey: [source.key, "content", id],
     enabled: !!name,
@@ -71,7 +103,7 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
     queryFn: async () => {
       const response = await fetch(source.contentUrl(id));
       if (!response.ok) throw new Error("Die Datei lässt sich nicht laden");
-      return openFile(new File([await response.blob()], name!));
+      return openFile(new File([await response.blob()], name!), type);
     },
   });
   const pdfUrl = opened.data?.pdfUrl;
@@ -92,9 +124,12 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
     onError: (error) => toast.error(error.message),
   });
 
-  const doc = opened.data?.doc ?? null;
+  const isInvoice = type === "invoice";
+  const doc = (isInvoice && opened.data?.doc) || null;
   const formatted = useMemo(() => (doc ? formatXml(doc) : null), [doc]);
   const invoice = useMemo(() => (doc ? buildInvoice(doc) : null), [doc]);
+  // XML that does not parse is still shown, as plain text.
+  const unparsed = useMemo(() => (isInvoice && !doc && opened.data?.xml ? highlight(opened.data.xml, "text", null).lines : []), [isInvoice, doc, opened.data]);
   const stored = details.data?.report ?? null;
   const choosable = offersXRechnung(stored);
   const ruleset = choosable ? query.regeln : "zugferd";
@@ -164,7 +199,8 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
   }
 
   const file = opened.data;
-  const available: Record<PanelId, boolean> = { pdf: !file || !!file.pdfUrl, xml: true, check: true };
+  // Only invoices have a PDF and a validation; every other file is one panel of text.
+  const available: Record<PanelId, boolean> = { pdf: isInvoice && (!file || !!file.pdfUrl), xml: true, check: isInvoice };
   const visible = PANELS.filter((panel) => available[panel] && query[panel]);
   const shown = visible.length ? visible : (["xml"] as PanelId[]);
   const toggle = (panel: PanelId) => {
@@ -204,7 +240,9 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
 
   const panels: Record<PanelId, React.ReactNode> = {
     pdf: file?.pdfUrl ? <iframe src={`${file.pdfUrl}#navpanes=0&view=FitH`} title="PDF" className="h-full w-full border-0" /> : loading,
-    xml: (
+    xml: !isInvoice ? (
+      file ? <TextPanel file={file} type={type} view={query.view} onView={(view) => setQuery({ view })} /> : loading
+    ) : (
       <div className="flex h-full flex-col">
         <PanelHeader title="XML">
           {file?.xml && (
@@ -222,7 +260,7 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
           ) : !file.xml ? (
             <Empty>Diese PDF enthält keine Rechnungsdaten.</Empty>
           ) : query.view === "roh" ? (
-            <XmlRaw formatted={formatted} source={file.xml} errorLines={errorLines} focus={focus?.line !== undefined ? { line: focus.line } : null} />
+            <CodeView lines={formatted?.lines ?? unparsed} errorLines={errorLines} focus={focus?.line !== undefined ? { line: focus.line } : null} />
           ) : invoice ? (
             <XmlPretty invoice={invoice} focus={focus} />
           ) : (
@@ -268,7 +306,7 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
             <p className="truncate text-sm font-medium">{name}</p>
           )}
         </div>
-        <div className="flex items-center gap-0.5 rounded-lg bg-muted p-[3px]" role="group" aria-label="Bereiche">
+        <div className={cn("flex items-center gap-0.5 rounded-lg bg-muted p-[3px]", !isInvoice && "hidden")} role="group" aria-label="Bereiche">
           {PANELS.filter((panel) => available[panel]).map((panel) => (
             <button
               key={panel}
