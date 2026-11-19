@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "kysely";
-import { ACCEPTED, MAX_FILE_BYTES, nameSchema, type Access, type Crumb, type FileDetails, type Folder, type Listing, type Node } from "@/lib/nodes";
+import { fileType, isPdf, type FileType } from "@/lib/file-type";
+import { MAX_FILE_BYTES, nameSchema, type Access, type Crumb, type FileDetails, type Folder, type Listing, type Node } from "@/lib/nodes";
 import { db } from "./db";
 import { HttpError } from "./http";
 import { deleteObjects, getObject, putObject } from "./storage";
@@ -15,7 +16,7 @@ import { statusOf, validate } from "./validate";
  * (children, details, content, pathTo, tree) are for public links, which check access in shares.ts.
  */
 
-const COLUMNS = ["node.id", "node.parent_id", "node.kind", "node.name", "node.size", "node.status", "node.updated_at", "node.owner_id"] as const;
+const COLUMNS = ["node.id", "node.parent_id", "node.kind", "node.name", "node.size", "node.type", "node.status", "node.updated_at", "node.owner_id"] as const;
 /** Only the profile of the stored report, so listings don't load whole reports. */
 const PROFILE = sql<string | null>`node.report->>'profile'`.as("profile");
 type Row = {
@@ -24,6 +25,7 @@ type Row = {
   kind: "folder" | "file";
   name: string;
   size: number | string | null;
+  type: FileType | null;
   status: Node["status"];
   profile: string | null;
   updated_at: Date;
@@ -67,6 +69,8 @@ export function toNode(row: Row): Node {
     kind: row.kind,
     name: row.name,
     size: row.size === null ? null : Number(row.size),
+    // Files from before the column existed are all PDF or XML invoices.
+    type: row.kind === "file" ? (row.type ?? "invoice") : null,
     status: row.status,
     profile: row.profile,
     updatedAt: row.updated_at.toISOString(),
@@ -310,10 +314,17 @@ export async function createFolder(userId: string, parentId: string | null, name
   return listed(userId, id);
 }
 
+/** Mustang tells PDF from XML by the ending, which a file recognised by its content may lack. */
+function validatorName(bytes: Uint8Array, name: string) {
+  const ending = isPdf(bytes) ? ".pdf" : ".xml";
+  return name.toLowerCase().endsWith(ending) ? name : `${name}${ending}`;
+}
+
 /** Validation failing (service down) must not lose the upload, so the file is stored without a status. */
-async function check(bytes: Uint8Array, name: string) {
+async function check(bytes: Uint8Array, name: string, type: FileType) {
+  if (type !== "invoice") return { report: null, status: null };
   try {
-    const report = await validate(bytes, name);
+    const report = await validate(bytes, validatorName(bytes, name));
     return { report, status: statusOf(report) };
   } catch (error) {
     console.error(`Validating ${name} failed`, error);
@@ -322,15 +333,16 @@ async function check(bytes: Uint8Array, name: string) {
 }
 
 export async function upload(userId: string, parentId: string | null, file: File): Promise<Node> {
-  if (!ACCEPTED.test(file.name)) throw new HttpError(415, "Nur PDF- und XML-Dateien");
   if (file.size > MAX_FILE_BYTES) throw new HttpError(413, "Datei ist größer als 50 MB");
   // The same rules as for typed names: a name like "../x.xml" would become a path in a zip.
   const name = nameSchema.parse(file.name);
   await target(userId, parentId);
 
   const bytes = new Uint8Array(await file.arrayBuffer());
+  const type = fileType(bytes, name);
+  if (!type) throw new HttpError(415, "Nur PDF- und Textdateien");
   const key = `files/${randomUUID()}`;
-  const [checked] = await Promise.all([check(bytes, name), putObject(key, bytes, file.type || "application/octet-stream")]);
+  const [checked] = await Promise.all([check(bytes, name, type), putObject(key, bytes, file.type || "application/octet-stream")]);
   // Checked again after the slow part: access may have ended while the file was validated and stored.
   const { ownerId } = await target(userId, parentId);
   const { id } = await db()
@@ -341,6 +353,7 @@ export async function upload(userId: string, parentId: string | null, file: File
       name: await freeName(parentId, ownerId, name),
       size: bytes.byteLength,
       storage_key: key,
+      type,
       status: checked.status,
       report: checked.report ? (JSON.stringify(checked.report) as never) : null,
       created_by: userId,
@@ -355,8 +368,9 @@ export async function upload(userId: string, parentId: string | null, file: File
 export async function revalidate(userId: string, id: string): Promise<FileDetails> {
   const { row } = await requireAccess(userId, id, "edit");
   if (row.kind !== "file" || !row.storage_key) throw new HttpError(400, "Kein Dokument");
+  if (row.type && row.type !== "invoice") throw new HttpError(400, "Nur Rechnungen lassen sich prüfen");
   const bytes = await (await getObject(row.storage_key)).bytes();
-  const report = await validate(bytes, row.name).catch((error) => {
+  const report = await validate(bytes, validatorName(bytes, row.name)).catch((error) => {
     console.error(`Validating ${row.name} failed`, error);
     throw new HttpError(502, "Validator nicht erreichbar");
   });
@@ -370,8 +384,7 @@ export async function revalidate(userId: string, id: string): Promise<FileDetail
 }
 
 export async function rename(userId: string, id: string, name: string): Promise<Node> {
-  const current = await requireChange(userId, id);
-  if (current.kind === "file" && !ACCEPTED.test(name)) throw new HttpError(400, "Die Endung muss .pdf oder .xml bleiben");
+  await requireChange(userId, id);
   await db().updateTable("node").set({ name, updated_at: new Date() }).where("id", "=", id).execute();
   return listed(userId, id);
 }

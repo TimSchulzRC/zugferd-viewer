@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FILE_TYPES } from "./file-type";
 import { reportSchema } from "./report";
 
 /** Shapes shared by the API routes and the client. */
@@ -16,6 +17,9 @@ export const nodeSchema = z.object({
   kind: z.enum(["folder", "file"]),
   name: z.string(),
   size: z.number().nullable(),
+  /** What a file is, null for folders. A type this version does not know yet reads as plain text. */
+  type: z.enum(FILE_TYPES).catch("text").nullable().default(null),
+  /** Only invoices are validated, so every other file has no status. */
   status: z.enum(["einvoice", "valid", "invalid"]).nullable(),
   /** The profile id from the last validation, null for folders and files the validator could not read. */
   profile: z.string().nullable().default(null),
@@ -52,7 +56,6 @@ export const nameSchema = z
   .refine((name) => !/[/\\]/.test(name) && name !== "." && name !== "..", "Name darf weder / noch \\ enthalten");
 
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
-export const ACCEPTED = /\.(pdf|xml)$/i;
 
 /** A link for one outside person, as the people inside see it. */
 export const shareSchema = z.object({

@@ -1,8 +1,13 @@
+import { decodeText, isPdf, type FileType } from "./file-type";
+
 export type OpenedFile = {
   file: File;
   pdfUrl: string | null;
+  /** The invoice data of a PDF, or the file itself if it is XML. */
   xml: string | null;
   doc: Document | null;
+  /** The whole file as text, null for a PDF. */
+  text: string | null;
 };
 
 // Names the standards prescribe for the embedded invoice, most recent first.
@@ -31,15 +36,16 @@ function parse(xml: string | null): Document | null {
   return doc.getElementsByTagName("parsererror").length ? null : doc;
 }
 
-export async function openFile(file: File): Promise<OpenedFile> {
+export async function openFile(file: File, type: FileType): Promise<OpenedFile> {
   const bytes = await file.arrayBuffer();
-  const isPdf = new TextDecoder("latin1").decode(bytes.slice(0, 1024)).includes("%PDF-");
-  if (!isPdf) {
-    const xml = new TextDecoder().decode(bytes);
-    return { file, pdfUrl: null, xml, doc: parse(xml) };
+  if (!isPdf(new Uint8Array(bytes))) {
+    const text = decodeText(new Uint8Array(bytes)) ?? new TextDecoder().decode(bytes);
+    // An invoice is XML even when broken; of the other types only those that start like XML are.
+    const xml = type === "invoice" || text.trimStart().startsWith("<") ? text : null;
+    return { file, pdfUrl: null, xml, doc: parse(xml), text };
   }
   // pdf.js takes ownership of the buffer it is given, so hand it a copy.
   const xml = await embeddedXml(bytes.slice(0));
   const pdfUrl = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-  return { file, pdfUrl, xml, doc: parse(xml) };
+  return { file, pdfUrl, xml, doc: parse(xml), text: null };
 }

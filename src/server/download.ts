@@ -32,9 +32,9 @@ export async function downloadResponse(ids: string[], entries: Entries): Promise
   return new Response(downloadZip(files()).body, { headers: { ...UNTRUSTED, "Content-Type": "application/zip", "Content-Disposition": attachment(name) } });
 }
 
-/** The PDF or XML itself, for the viewer. */
+/** The file itself, for the viewer, which reads it as bytes and never lets the browser render it. */
 export function inlineResponse({ name, size, object }: Awaited<ReturnType<typeof content>>): Response {
   return new Response(object.stream(), {
-    headers: { ...UNTRUSTED, "Content-Type": /\.pdf$/i.test(name) ? "application/pdf" : "application/xml", "Content-Length": String(size) },
+    headers: { ...UNTRUSTED, "Content-Type": /\.pdf$/i.test(name) ? "application/pdf" : /\.xml$/i.test(name) ? "application/xml" : "application/octet-stream", "Content-Length": String(size) },
   });
 }

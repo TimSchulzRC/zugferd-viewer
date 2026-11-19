@@ -16,6 +16,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 import { Logo } from "@/components/logo";
 import { UserMenu } from "@/components/user-menu";
 import { api, download } from "@/lib/api";
+import { FILE_TYPE_LABELS } from "@/lib/file-type";
 import type { Node } from "@/lib/nodes";
 import { describeProfile, formatOf } from "@/lib/report";
 import { collectDropped, uploadAll, type Pending } from "@/lib/upload";
@@ -52,9 +53,14 @@ export function formatSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toLocaleString("de-DE", { maximumFractionDigits: 1 })} MB`;
 }
 
-/** ZUGFeRD or XRechnung, with the exact profile on hover. Hidden where the list is narrow, like its header. */
+/** ZUGFeRD or XRechnung for an invoice, else what kind of file it is. */
+function formatLabel(node: Node): string | null {
+  return node.type && node.type !== "invoice" ? FILE_TYPE_LABELS[node.type] : formatOf(node.profile);
+}
+
+/** The format, for invoices with the exact profile on hover. Hidden where the list is narrow, like its header. */
 export function FormatCell({ node }: { node: Node }) {
-  const format = formatOf(node.profile);
+  const format = formatLabel(node);
   return (
     <div className="hidden whitespace-nowrap @xl:block" title={describeProfile(node.profile)?.name}>
       {node.kind === "file" && (format ?? <span className="text-muted-foreground">–</span>)}
@@ -98,7 +104,7 @@ export function FileManager() {
       const byName = a.name.localeCompare(b.name, "de", { numeric: true, sensitivity: "base" });
       if (sort.key === "size") return ((a.size ?? 0) - (b.size ?? 0)) * direction || byName;
       if (sort.key === "updatedAt") return a.updatedAt.localeCompare(b.updatedAt) * direction || byName;
-      if (sort.key === "format") return (formatOf(a.profile) ?? "").localeCompare(formatOf(b.profile) ?? "") * direction || byName;
+      if (sort.key === "format") return (formatLabel(a) ?? "").localeCompare(formatLabel(b) ?? "") * direction || byName;
       if (sort.key === "status") return (a.status ?? "").localeCompare(b.status ?? "") * direction || byName;
       return byName * direction;
     };
@@ -317,7 +323,6 @@ export function FileManager() {
         ref={fileInput}
         type="file"
         multiple
-        accept=".pdf,.xml"
         className="hidden"
         onChange={(event) => {
           upload(ordner, [...(event.target.files ?? [])].map((file) => ({ file, dirs: [] })));
@@ -540,7 +545,7 @@ export function FileManager() {
                       <status.icon className={cn("size-4 shrink-0", status.color)} /> {status.label}
                     </>
                   )}
-                  {node.kind === "file" && !status && <span className="text-muted-foreground">Nicht geprüft</span>}
+                  {node.kind === "file" && !status && <span className="text-muted-foreground">{node.type === "invoice" ? "Nicht geprüft" : "–"}</span>}
                 </div>
                 <div className="text-right text-muted-foreground tabular-nums">{node.size !== null && formatSize(node.size)}</div>
                 <div className="hidden whitespace-nowrap text-muted-foreground @2xl:block">{dateFormat.format(new Date(node.updatedAt))}</div>
@@ -579,7 +584,7 @@ export function FileManager() {
               {canAdd ? (
                 <>
                   <Upload className="size-8" strokeWidth={1.5} />
-                  <p>PDF- und XML-Rechnungen hierher ziehen</p>
+                  <p>Rechnungen, IDocs und andere Textdateien hierher ziehen</p>
                 </>
               ) : (
                 <p>Dieser Ordner ist leer</p>

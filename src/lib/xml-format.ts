@@ -1,6 +1,8 @@
-export type TokenKind = "bracket" | "prefix" | "name" | "attr" | "equals" | "quote" | "value" | "text" | "number" | "comment" | "prolog";
-export type Token = { kind: TokenKind; text: string };
-export type Line = { indent: number; tokens: Token[] };
+export type TokenKind = "bracket" | "prefix" | "name" | "attr" | "equals" | "quote" | "value" | "text" | "number" | "comment" | "prolog" | "plain" | "alt";
+/** title explains the token on hover: the field name of a value in a fixed-width file. */
+export type Token = { kind: TokenKind; text: string; title?: string };
+/** gap sets the line off from the one before, where a new block starts. */
+export type Line = { indent: number; tokens: Token[]; gap?: boolean };
 export type FormattedXml = { lines: Line[]; lineOf: Map<Element, number> };
 
 const MAX_TEXT = 300;
