@@ -44,7 +44,11 @@ const SESSION_HOURS = 24;
  */
 const UPLOAD_FILES_PER_DAY = 200;
 const UPLOAD_BYTES_PER_DAY = 1024 * 1024 * 1024;
-/** Uploads one link may run at once. Each holds its file in memory, so this bounds what a link costs. Matches the browser's PARALLEL. */
+/**
+ * Uploads one link may run at once. Each holds its file in memory, so this bounds what a link costs.
+ * Matches the browser's PARALLEL. The count lives in this process: the app runs as one (Dockerfile,
+ * `node server.js`). Running several would allow this many per process.
+ */
 const UPLOADS_AT_ONCE = 3;
 const running = new Map<string, number>();
 

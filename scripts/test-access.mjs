@@ -456,20 +456,29 @@ heading("9. Personen außerhalb laden über einen Link hoch");
   const flutLink = await must(await anna.createLink(flut.id, "flut@demo.test"), "Link anlegen");
   await must(await anna.allowUpload(flutLink.id, true), "Hochladen erlauben");
   const flooder = await new Visitor(flutLink.token).unlock();
-  // Three uploads that announce 1 kB and send 3 bytes hold their slots until released.
+  // Three uploads that announce 1 kB and send 3 bytes hold their slots until released. Probes repeat
+  // for up to 5 s, because the server takes the slots and frees them a moment after the client acts.
+  let landed = 0;
+  const probe = async (until) => {
+    for (let i = 0; i < 50; i++) {
+      const { status } = await flooder.upload(null, `probe-${i}.txt`, "x");
+      if (status === 200) landed++;
+      if (status === until) return status;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    return "Zeit abgelaufen";
+  };
   const held = Array.from({ length: 3 }, () => flooder.raw({ "content-length": "1024" }, "abc"));
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  check("3 Uploads laufen: der vierte → 429", ...statusIs(await flooder.upload(null, "vierter.txt", "x"), 429));
+  check("3 Uploads laufen: der vierte → 429", ...statusIs({ status: await probe(429) }, 429));
   for (const request of held) request.release();
   await Promise.all(held);
-  check("Abgebrochene Uploads geben ihren Platz frei", ...statusIs(await flooder.upload(null, "danach.txt", "x"), 200));
+  check("Abgebrochene Uploads geben ihren Platz frei", ...statusIs({ status: await probe(200) }, 200));
   const statuses = [];
   for (let batch = 0; batch < 80; batch++) {
     const results = await Promise.all(Array.from({ length: 3 }, (_, i) => flooder.upload(null, `flut-${batch}-${i}.txt`, "x")));
     statuses.push(...results.map((r) => r.status));
   }
-  // »danach.txt« is the first of the 200.
-  const accepted = 1 + statuses.filter((status) => status === 200).length;
+  const accepted = landed + statuses.filter((status) => status === 200).length;
   check("240 weitere Dateien, je 3 gleichzeitig: insgesamt genau 200 kommen an, der Rest → 429", accepted === 200 && statuses.every((s) => s === 200 || s === 429), `${accepted} angekommen`);
   await anna.remove([flut.id]);
 }
