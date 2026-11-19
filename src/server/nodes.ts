@@ -282,7 +282,7 @@ export async function fileFor(userId: string, id: string): Promise<FileDetails> 
 }
 
 /** "Rechnung.pdf" becomes "Rechnung (2).pdf" if the folder already has one. Top levels are per owner. */
-async function freeName(parentId: string | null, ownerId: string, wanted: string, executor: ReturnType<typeof db> = db()): Promise<string> {
+export async function freeName(parentId: string | null, ownerId: string, wanted: string, executor: ReturnType<typeof db> = db()): Promise<string> {
   const query = executor.selectFrom("node").select("name");
   const siblings = await (parentId === null ? query.where("parent_id", "is", null).where("owner_id", "=", ownerId) : query.where("parent_id", "=", parentId)).execute();
   return unused(wanted, new Set(siblings.map((s) => s.name.toLowerCase())));
@@ -332,33 +332,42 @@ async function check(bytes: Uint8Array, name: string, type: FileType) {
   }
 }
 
-export async function upload(userId: string, parentId: string | null, file: File): Promise<Node> {
+/** The name an uploaded file gets, after the checks that need no reading. */
+export function uploadName(file: File) {
   if (file.size > MAX_FILE_BYTES) throw new HttpError(413, "Datei ist größer als 50 MB");
   // The same rules as for typed names: a name like "../x.xml" would become a path in a zip.
-  const name = nameSchema.parse(file.name);
-  await target(userId, parentId);
+  return nameSchema.parse(file.name);
+}
 
+/**
+ * Reads, validates and stores an uploaded file. What comes back are the columns of its row; the
+ * caller inserts it, or removes the object again if it cannot.
+ */
+export async function store(file: File, name: string) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const type = fileType(bytes, name);
   if (!type) throw new HttpError(415, "Nur PDF- und Textdateien");
   const key = `files/${randomUUID()}`;
   const [checked] = await Promise.all([check(bytes, name, type), putObject(key, bytes, file.type || "application/octet-stream")]);
+  return {
+    kind: "file" as const,
+    size: bytes.byteLength,
+    storage_key: key,
+    type,
+    status: checked.status,
+    report: checked.report ? (JSON.stringify(checked.report) as never) : null,
+  };
+}
+
+export async function upload(userId: string, parentId: string | null, file: File): Promise<Node> {
+  const name = uploadName(file);
+  await target(userId, parentId);
+  const stored = await store(file, name);
   // Checked again after the slow part: access may have ended while the file was validated and stored.
   const { ownerId } = await target(userId, parentId);
   const { id } = await db()
     .insertInto("node")
-    .values({
-      parent_id: parentId,
-      kind: "file",
-      name: await freeName(parentId, ownerId, name),
-      size: bytes.byteLength,
-      storage_key: key,
-      type,
-      status: checked.status,
-      report: checked.report ? (JSON.stringify(checked.report) as never) : null,
-      created_by: userId,
-      owner_id: ownerId,
-    })
+    .values({ ...stored, parent_id: parentId, name: await freeName(parentId, ownerId, name), created_by: userId, owner_id: ownerId })
     .returning("id")
     .executeTakeFirstOrThrow();
   return listed(userId, id);

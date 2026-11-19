@@ -5,6 +5,7 @@ import { Copy, Eye, Mail, PenLine, Share2, Trash2, UserRound, Users } from "luci
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,7 +45,7 @@ function today() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
-function ShareRow({ share, onDelete }: { share: Share; onDelete: () => void }) {
+function ShareRow({ share, folder, onUpload, onDelete }: { share: Share; folder: boolean; onUpload: (canUpload: boolean) => void; onDelete: () => void }) {
   const url = shareUrl(share.token);
   const facts = [
     share.expired ? "abgelaufen" : share.expiresOn ? `gültig bis ${dayFormat.format(new Date(`${share.expiresOn}T00:00`))}` : "ohne Ablaufdatum",
@@ -64,6 +65,12 @@ function ShareRow({ share, onDelete }: { share: Share; onDelete: () => void }) {
           onFocus={(event) => event.currentTarget.select()}
           className="w-full truncate bg-transparent font-mono text-xs text-muted-foreground outline-none"
         />
+        {folder && (
+          <label className="mt-1 flex w-fit cursor-pointer items-center gap-2 text-xs">
+            <Checkbox checked={share.canUpload} onCheckedChange={(checked) => onUpload(checked === true)} />
+            Darf Dateien hochladen
+          </label>
+        )}
       </div>
       <Button variant="ghost" size="icon-sm" aria-label="Link kopieren" disabled={share.expired} onClick={() => copyLink(share)}>
         <Copy />
@@ -264,6 +271,14 @@ export function ShareDialog({ node, onClose }: { node: Node; onClose: () => void
     },
     onError: (error) => toast.error(error.message),
   });
+  const allowUpload = useMutation({
+    mutationFn: ({ id, canUpload }: { id: string; canUpload: boolean }) => api.updateShare(id, { canUpload }),
+    onSuccess: (share) => {
+      refresh();
+      toast.success(share.canUpload ? `${share.email} darf jetzt Dateien hochladen` : `${share.email} kann nur noch ansehen und herunterladen`);
+    },
+    onError: (error) => toast.error(error.message),
+  });
   const remove = useMutation({
     mutationFn: (id: string) => api.deleteShare(id),
     onSuccess: () => {
@@ -287,12 +302,21 @@ export function ShareDialog({ node, onClose }: { node: Node; onClose: () => void
           <p className="font-medium">Mit einer Person außerhalb teilen</p>
           <p className="text-xs text-muted-foreground">
             Die Person bekommt einen Link per E-Mail. Beim Öffnen schicken wir ihr einen Code an genau diese Adresse, ein weitergeleiteter Link nützt also niemandem. Sie
-            kann {node.kind === "folder" ? "den Ordner mit allem darin" : "die Datei"} ansehen und herunterladen, aber nichts ändern.
+            kann{" "}
+            {node.kind === "folder"
+              ? "den Ordner mit allem darin ansehen und herunterladen. Wenn du es erlaubst, kann sie auch Dateien hineinladen. Umbenennen oder löschen kann sie nichts."
+              : "die Datei ansehen und herunterladen, aber nichts ändern."}
           </p>
           {shares.data && shares.data.length > 0 && (
             <ul className="flex max-h-48 flex-col gap-2 overflow-auto">
               {shares.data.map((share) => (
-                <ShareRow key={share.id} share={share} onDelete={() => remove.mutate(share.id)} />
+                <ShareRow
+                  key={share.id}
+                  share={share}
+                  folder={node.kind === "folder"}
+                  onUpload={(canUpload) => allowUpload.mutate({ id: share.id, canUpload })}
+                  onDelete={() => remove.mutate(share.id)}
+                />
               ))}
             </ul>
           )}

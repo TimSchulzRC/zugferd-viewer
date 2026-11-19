@@ -11,6 +11,7 @@
  * removed again in every run. Each run first deletes what the demo users own, then starts fresh.
  */
 import { existsSync } from "node:fs";
+import { request as httpRequest } from "node:http";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const BASE = (process.argv[2] ?? process.env.PUBLIC_URL ?? process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -42,9 +43,9 @@ class Session {
     this.cookies = new Map();
   }
 
-  async fetch(path, { method = "GET", json, form } = {}) {
-    const headers = { origin: BASE, cookie: [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; ") };
-    let body;
+  async fetch(path, { method = "GET", json, form, body: raw, headers: extra = {} } = {}) {
+    const headers = { origin: BASE, cookie: [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; "), ...extra };
+    let body = raw;
     if (json !== undefined) {
       headers["content-type"] = "application/json";
       body = JSON.stringify(json);
@@ -123,11 +124,65 @@ class Session {
   linkShares(id) {
     return this.fetch(`/api/nodes/${id}/shares`);
   }
+  createLink(id, email, expiresOn = null) {
+    return this.fetch(`/api/nodes/${id}/shares`, { method: "POST", json: { email, expiresOn } });
+  }
+  allowUpload(shareId, canUpload) {
+    return this.fetch(`/api/shares/${shareId}`, { method: "PATCH", json: { canUpload } });
+  }
+  deleteLink(shareId) {
+    return this.fetch(`/api/shares/${shareId}`, { method: "DELETE" });
+  }
   folders() {
     return this.fetch("/api/folders");
   }
   colleagues() {
     return this.fetch("/api/users");
+  }
+}
+
+/** Someone outside with a link: confirms the mailed code (000000 in dev) and keeps the cookie. */
+class Visitor extends Session {
+  constructor(token) {
+    super("visitor");
+    this.base = `/api/s/${token}`;
+  }
+  async unlock() {
+    await must(await this.fetch(`${this.base}/code`, { method: "POST" }), "Code anfordern");
+    await must(await this.fetch(`${this.base}/unlock`, { method: "POST", json: { code: "000000" } }), "Code eingeben");
+    return this;
+  }
+  info() {
+    return this.fetch(this.base);
+  }
+  list(parentId) {
+    return this.fetch(`${this.base}/nodes${parentId ? `?parent=${parentId}` : ""}`);
+  }
+  upload(parentId, name, content = invoice(name), headers = {}) {
+    return this.fetch(`${this.base}/upload${parentId ? `?parent=${encodeURIComponent(parentId)}` : ""}`, {
+      method: "POST",
+      body: content,
+      headers: { "x-file-name": encodeURIComponent(name), ...headers },
+    });
+  }
+  /**
+   * A request the browser would never send: chunked without a length, or a length far too big. It
+   * stays open until the server answers or release() is called, so it can also hold an upload slot.
+   */
+  raw(headers, body) {
+    const cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; ");
+    let request;
+    const status = new Promise((resolve) => {
+      request = httpRequest(BASE + `${this.base}/upload`, { method: "POST", headers: { origin: BASE, cookie, "x-file-name": "offen.txt", ...headers } }, (response) => {
+        response.resume();
+        resolve(response.statusCode);
+      });
+      request.on("error", () => resolve("abgebrochen"));
+      request.setTimeout(10_000, () => request.destroy());
+      request.write(body);
+      if (headers["transfer-encoding"]) request.end();
+    });
+    return Object.assign(status, { release: () => request.destroy() });
   }
 }
 
@@ -331,7 +386,104 @@ heading("8. Angriffe auf Pfade und Ordnerbaum");
   );
 }
 
-heading("9. Nutzer entfernen: der Admin übernimmt die Dateien");
+heading("9. Personen außerhalb laden über einen Link hoch");
+{
+  // Another link, with an end date and uploads allowed, must not lend its rights to the one tested here.
+  const andererLink = await must(await anna.createLink(fuerBen.id, "andere@demo.test", "2099-12-31"), "Anderen Link anlegen");
+  await must(await anna.allowUpload(andererLink.id, true), "Hochladen beim anderen Link erlauben");
+  const ziel = await must(await anna.folder(null, "Anna Eingang (Link mit Hochladen)"), "Ordner anlegen");
+  const vorhanden = await must(await anna.upload(ziel.id, "vorhanden.xml"), "Hochladen");
+  const drin = await must(await anna.folder(ziel.id, "Unterordner im Eingang"), "Ordner anlegen");
+  const raus = await must(await anna.folder(ziel.id, "Wird verschoben"), "Ordner anlegen");
+  const link = await must(await anna.createLink(ziel.id, "lieferant@demo.test"), "Link anlegen");
+  const fileLink = await must(await anna.createLink(alleFile.id, "lieferant@demo.test"), "Link auf Datei anlegen");
+  const visitor = await new Visitor(link.token).unlock();
+  const stranger = new Visitor(link.token);
+
+  check("Neuer Link: Hochladen aus", link.canUpload === false && (await visitor.info()).data?.canUpload === false);
+  check("Hochladen ohne Erlaubnis → 403", ...statusIs(await visitor.upload(null, "zu-frueh.xml"), 403));
+  check("Die Erlaubnis eines anderen Links gilt nicht → 403", ...statusIs(await visitor.upload(fuerBen.id, "fremder-link.xml"), 403));
+  await must(await anna.deleteLink(andererLink.id), "Anderen Link löschen");
+  check("Ben kann Annas Link nicht freischalten → 404", ...statusIs(await ben.allowUpload(link.id, true), 404));
+  const enabled = await anna.allowUpload(link.id, true);
+  check("Anna erlaubt das Hochladen nachträglich", enabled.status === 200 && enabled.data?.canUpload === true, `HTTP ${enabled.status}`);
+  check("Die Seite des Links bietet jetzt Hochladen an", (await visitor.info()).data?.canUpload === true);
+  check("Link auf eine einzelne Datei: Hochladen erlauben → 400", ...statusIs(await anna.allowUpload(fileLink.id, true), 400));
+
+  const up = await visitor.upload(null, "vom-lieferanten.xml");
+  check("Hochladen in den geteilten Ordner", up.status === 200 && up.data?.parentId === null, `HTTP ${up.status} ${JSON.stringify(up.data)}`);
+  const annaSees = await anna.list(ziel.id);
+  check("Anna sieht die Datei, sie gehört ihr", byName(annaSees, "vom-lieferanten.xml")?.access === "owner", names(annaSees).join(", "));
+  check("Die Person sieht ihre Datei im Link", names(await visitor.list(null)).includes("vom-lieferanten.xml"));
+  check("Hochladen in einen Unterordner des Links", (await visitor.upload(drin.id, "im-unterordner.xml")).status === 200);
+  const again = await visitor.upload(null, "vorhanden.xml", "ersetzt?");
+  check("Gleicher Name ersetzt nichts, die neue heißt »vorhanden (2).xml«", again.data?.name === "vorhanden (2).xml", `${again.status} ${again.data?.name}`);
+  check("Die vorhandene Datei ist unverändert", (await anna.content(vorhanden.id)).text.includes("<rsm:CrossIndustryInvoice"));
+  check("Text- und IDoc-Dateien gehen auch", (await visitor.upload(null, "notiz.txt", "Hallo")).status === 200);
+
+  check("In einen fremden Ordner (Anna privat) → 404", ...statusIs(await visitor.upload(privat.id, "fremd.xml"), 404));
+  check("In Bens Ordner → 404", ...statusIs(await visitor.upload(benPrivat.id, "fremd.xml"), 404));
+  check("Eine Datei als Ziel → 400", ...statusIs(await visitor.upload(vorhanden.id, "fremd.xml"), 400));
+  check("Ziel ist keine ID → 400", ...statusIs(await visitor.upload("../../x", "fremd.xml"), 400));
+  check("Name »../../boese.xml« → 400", ...statusIs(await visitor.upload(null, "../../boese.xml"), 400));
+  check("Binärdatei → 415", ...statusIs(await visitor.upload(null, "programm.exe", new Uint8Array([0x4d, 0x5a, 0, 0, 1, 2, 0, 0])), 415));
+  check("Ohne eingegebenen Code → 403", ...statusIs(await stranger.upload(null, "ohne-code.xml"), 403));
+  check("Ohne Dateinamen → 400", ...statusIs(await visitor.fetch(`${visitor.base}/upload`, { method: "POST", body: "x" }), 400));
+  check("Kaputt kodierter Dateiname → 400", ...statusIs(await visitor.upload(null, "x", "x", { "x-file-name": "%E0%A4%A" }), 400));
+  const csrf = await fetch(BASE + `${visitor.base}/upload`, {
+    method: "POST",
+    headers: { origin: "https://boese.example", "x-file-name": "csrf.xml", cookie: [...visitor.cookies].map(([k, v]) => `${k}=${v}`).join("; ") },
+    body: invoice("csrf"),
+  });
+  check("Von einer fremden Seite abgeschickt → 403", ...statusIs({ status: csrf.status }, 403));
+  check("Ohne Längenangabe (chunked) → 411", ...statusIs({ status: await visitor.raw({ "transfer-encoding": "chunked" }, "abc") }, 411));
+  check("Längenangabe über 50 MB → 413, bevor gelesen wird", ...statusIs({ status: await visitor.raw({ "content-length": String(200 * 1024 * 1024) }, "abc") }, 413));
+  check("Löschen über die App-API → 401", ...statusIs(await visitor.remove([vorhanden.id]), 401));
+
+  await must(await anna.move([raus.id], privat.id), "Ordner aus dem Link verschieben");
+  check("Ordner aus dem Link verschoben: dorthin → 404", ...statusIs(await visitor.upload(raus.id, "zu-spaet.xml"), 404));
+  await must(await anna.allowUpload(link.id, false), "Hochladen beenden");
+  check("Anna nimmt die Erlaubnis zurück: Hochladen → 403", ...statusIs(await visitor.upload(null, "zu-spaet.xml"), 403));
+  check("Ohne Erlaubnis und 40 MB angekündigt → 403, bevor gelesen wird", ...statusIs({ status: await visitor.raw({ "content-length": String(40 * 1024 * 1024) }, "abc") }, 403));
+  check("Ansehen geht weiterhin", (await visitor.list(null)).status === 200);
+  await must(await anna.deleteLink(link.id), "Link löschen");
+  check("Link gelöscht: Hochladen → 404", ...statusIs(await visitor.upload(null, "zu-spaet.xml"), 404));
+  const left = names(await anna.list(ziel.id));
+  check("Was hochgeladen war, bleibt bei Anna", ["vom-lieferanten.xml", "vorhanden (2).xml", "notiz.txt"].every((n) => left.includes(n)), left.join(", "));
+
+  // 200 Dateien am Tag pro Link, auch wenn viele gleichzeitig ankommen.
+  const flut = await must(await anna.folder(null, "Anna Tageslimit"), "Ordner anlegen");
+  const flutLink = await must(await anna.createLink(flut.id, "flut@demo.test"), "Link anlegen");
+  await must(await anna.allowUpload(flutLink.id, true), "Hochladen erlauben");
+  const flooder = await new Visitor(flutLink.token).unlock();
+  // Three uploads that announce 1 kB and send 3 bytes hold their slots until released. Probes repeat
+  // for up to 5 s, because the server takes the slots and frees them a moment after the client acts.
+  let landed = 0;
+  const probe = async (until) => {
+    for (let i = 0; i < 50; i++) {
+      const { status } = await flooder.upload(null, `probe-${i}.txt`, "x");
+      if (status === 200) landed++;
+      if (status === until) return status;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    return "Zeit abgelaufen";
+  };
+  const held = Array.from({ length: 3 }, () => flooder.raw({ "content-length": "1024" }, "abc"));
+  check("3 Uploads laufen: der vierte → 429", ...statusIs({ status: await probe(429) }, 429));
+  for (const request of held) request.release();
+  await Promise.all(held);
+  check("Abgebrochene Uploads geben ihren Platz frei", ...statusIs({ status: await probe(200) }, 200));
+  const statuses = [];
+  for (let batch = 0; batch < 80; batch++) {
+    const results = await Promise.all(Array.from({ length: 3 }, (_, i) => flooder.upload(null, `flut-${batch}-${i}.txt`, "x")));
+    statuses.push(...results.map((r) => r.status));
+  }
+  const accepted = landed + statuses.filter((status) => status === 200).length;
+  check("240 weitere Dateien, je 3 gleichzeitig: insgesamt genau 200 kommen an, der Rest → 429", accepted === 200 && statuses.every((s) => s === 200 || s === 429), `${accepted} angekommen`);
+  await anna.remove([flut.id]);
+}
+
+heading("10. Nutzer entfernen: der Admin übernimmt die Dateien");
 {
   const doraFolder = await must(await dora.folder(null, "Dora Projekt"), "Ordner anlegen");
   await must(await dora.upload(doraFolder.id, "rechnung-dora.xml"), "Hochladen");
@@ -353,7 +505,7 @@ if (failed.length) {
 
 console.log(`
 \x1b[1mSelbst durchklicken\x1b[0m (${BASE}, Anmeldecode jeweils 000000, am besten je Person ein privates Fenster):
-  ${ANNA}   vier Ordner. Rechtsklick auf »Anna für alle (ansehen)« → Teilen zeigt »Alle Nutzer: Ansehen«.
+  ${ANNA}   fünf Ordner, darunter »Anna Eingang«, in den eine Person außerhalb über einen Link hochgeladen hat. Rechtsklick auf »Anna für alle (ansehen)« → Teilen zeigt »Alle Nutzer: Ansehen«.
   ${BEN}    »Ben privat«, zweimal »Jahresordner 2025« (seiner, Annas) und Annas geteilte Ordner mit ihrer Adresse daneben. In »Anna für Ben« darf er
                   hochladen, in »Anna für alle« steht »Nur ansehen« und es gibt keinen Hochladen-Knopf.
   ${CARLA}  »Anna für alle (ansehen)«, Annas »Jahresordner 2025« und »Dora Projekt« (geteilt von der entfernten Dora, jetzt dem Admin).

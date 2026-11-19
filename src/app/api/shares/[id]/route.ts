@@ -1,7 +1,12 @@
+import { shareUpdateSchema } from "@/lib/nodes";
 import { idSchema, route } from "@/server/http";
-import { deleteShare } from "@/server/shares";
+import { deleteShare, updateShare } from "@/server/shares";
 
-export const DELETE = route<RouteContext<"/api/shares/[id]">>(async (_request, user, { params }) => {
+type Context = RouteContext<"/api/shares/[id]">;
+
+export const PATCH = route<Context>(async (request, user, { params }) => updateShare(user.id, idSchema.parse((await params).id), shareUpdateSchema.parse(await request.json())));
+
+export const DELETE = route<Context>(async (_request, user, { params }) => {
   await deleteShare(user.id, idSchema.parse((await params).id));
   return { ok: true };
 });

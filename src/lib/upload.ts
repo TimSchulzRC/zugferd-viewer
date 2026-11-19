@@ -42,8 +42,16 @@ async function showable(file: File) {
   return isPdf(head) || decodeText(head) !== null;
 }
 
+/** Where uploads go. Without createFolder (public links), files from dropped folders land in parentId itself. */
+export type UploadTarget = {
+  upload: (parentId: string | null, file: File) => Promise<unknown>;
+  createFolder?: (parentId: string | null, name: string) => Promise<{ id: string }>;
+};
+
+const signedIn: UploadTarget = { upload: api.upload, createFolder: api.createFolder };
+
 /** Recreates the dropped folder structure below parentId, uploads the files and reports progress as a toast. */
-export async function uploadAll(parentId: string | null, pending: Pending[]) {
+export async function uploadAll(parentId: string | null, pending: Pending[], to: UploadTarget = signedIn) {
   const checked = await Promise.all(pending.map(({ file }) => showable(file).catch(() => false)));
   const accepted = pending.filter((_, index) => checked[index]);
   const skipped = pending.length - accepted.length;
@@ -58,13 +66,16 @@ export async function uploadAll(parentId: string | null, pending: Pending[]) {
     // Folders first and one at a time, so two files of the same folder don't both create it.
     const folderIds = new Map<string, string | null>([["", parentId]]);
     const targets: (string | null)[] = [];
+    const createFolder = to.createFolder;
     for (const { dirs } of accepted) {
       let key = "";
       let current = parentId;
-      for (const dir of dirs) {
-        key += `/${dir}`;
-        if (!folderIds.has(key)) folderIds.set(key, (await api.createFolder(current, dir)).id);
-        current = folderIds.get(key)!;
+      if (createFolder) {
+        for (const dir of dirs) {
+          key += `/${dir}`;
+          if (!folderIds.has(key)) folderIds.set(key, (await createFolder(current, dir)).id);
+          current = folderIds.get(key)!;
+        }
       }
       targets.push(current);
     }
@@ -75,7 +86,7 @@ export async function uploadAll(parentId: string | null, pending: Pending[]) {
         const index = next++;
         const { file } = accepted[index];
         try {
-          await api.upload(targets[index], file);
+          await to.upload(targets[index], file);
         } catch (error) {
           failures.push(`${file.name}: ${error instanceof Error ? error.message : "fehlgeschlagen"}`);
         }
