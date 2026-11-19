@@ -1,10 +1,10 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Download, FileText, Folder, KeyRound, LoaderCircle, Mail } from "lucide-react";
+import { ChevronRight, Download, FileText, Folder, KeyRound, LoaderCircle, Mail, Upload } from "lucide-react";
 import { useParams } from "next/navigation";
 import { parseAsString, useQueryStates } from "nuqs";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { DEV_CODE } from "@/lib/dev";
 import { dateFormat, FormatCell, formatSize, STATUS } from "@/components/file-manager";
 import { Logo } from "@/components/logo";
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Viewer } from "@/components/viewer";
 import { ApiError, shareApi, shareSource } from "@/lib/api";
 import type { Node } from "@/lib/nodes";
+import { collectDropped, uploadAll, type Pending } from "@/lib/upload";
 import { cn } from "@/lib/utils";
 
 const GRID =
@@ -115,11 +116,36 @@ function CodeForm({ token, email }: { token: string; email: string }) {
   );
 }
 
-function SharedFolder({ token, name, rootId, expiresOn }: { token: string; name: string; rootId: string; expiresOn: string | null }) {
+function SharedFolder({ token, name, rootId, expiresOn, canUpload }: { token: string; name: string; rootId: string; expiresOn: string | null; canUpload: boolean }) {
   const [{ ordner }, setQuery] = useQueryStates({ ordner: parseAsString, datei: parseAsString }, { history: "push" });
+  const queryClient = useQueryClient();
   const share = shareApi(token);
   const source = shareSource(token);
   const listing = useQuery({ queryKey: ["share", token, "nodes", ordner], queryFn: () => share.list(ordner) });
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [dropping, setDropping] = useState(false);
+
+  // Files from dropped folders go straight into this folder: visitors cannot create folders.
+  const upload = async (pending: Pending[]) => {
+    await uploadAll(ordner, pending, { upload: share.upload });
+    queryClient.invalidateQueries({ queryKey: ["share", token, "nodes"] });
+  };
+  const dropProps = canUpload
+    ? {
+        onDragOver: (event: React.DragEvent) => {
+          if (!event.dataTransfer.types.includes("Files")) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+          setDropping(true);
+        },
+        onDragLeave: () => setDropping(false),
+        onDrop: (event: React.DragEvent) => {
+          event.preventDefault();
+          setDropping(false);
+          collectDropped(event.dataTransfer).then(upload);
+        },
+      }
+    : {};
 
   const items = useMemo(
     () =>
@@ -154,13 +180,30 @@ function SharedFolder({ token, name, rootId, expiresOn }: { token: string; name:
               );
             })}
           </nav>
+          {canUpload && (
+            <>
+              <input
+                ref={fileInput}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(event) => {
+                  upload([...(event.target.files ?? [])].map((file) => ({ file, dirs: [] })));
+                  event.target.value = "";
+                }}
+              />
+              <Button size="sm" variant="outline" onClick={() => fileInput.current?.click()}>
+                <Upload /> Hochladen
+              </Button>
+            </>
+          )}
           <Button size="sm" onClick={() => source.download([ordner ?? rootId])}>
             <Download /> {ordner ? "Ordner herunterladen" : "Alles herunterladen"}
           </Button>
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div {...dropProps} className={cn("min-h-0 flex-1 overflow-auto", dropping && "bg-primary/5 ring-2 ring-primary ring-inset")}>
         <div className="@container mx-auto w-full max-w-6xl">
           <div role="row" className={cn(GRID, "sticky top-0 z-10 h-9 border-b bg-background text-xs text-muted-foreground")}>
             <span>Name</span>
@@ -201,7 +244,15 @@ function SharedFolder({ token, name, rootId, expiresOn }: { token: string; name:
               </div>
             );
           })}
-          {listing.isSuccess && items.length === 0 && <p className="px-6 py-24 text-center text-sm text-muted-foreground">Dieser Ordner ist leer.</p>}
+          {listing.isSuccess && items.length === 0 &&
+            (canUpload ? (
+              <div className="flex flex-col items-center gap-2 px-6 py-24 text-center text-sm text-muted-foreground">
+                <Upload className="size-8" strokeWidth={1.5} />
+                <p>Rechnungen, IDocs und andere Textdateien hierher ziehen</p>
+              </div>
+            ) : (
+              <p className="px-6 py-24 text-center text-sm text-muted-foreground">Dieser Ordner ist leer.</p>
+            ))}
           {listing.isError && <p className="px-6 py-24 text-center text-sm">{listing.error.message}</p>}
           {expiresOn && <p className="px-4 py-3 text-xs text-muted-foreground">Dieser Link gilt bis {dayFormat.format(new Date(`${expiresOn}T00:00`))}.</p>}
         </div>
@@ -210,7 +261,7 @@ function SharedFolder({ token, name, rootId, expiresOn }: { token: string; name:
   );
 }
 
-/** What someone without an account sees under /s/<token>: the code check, a read-only folder, or the viewer. */
+/** What someone without an account sees under /s/<token>: the code check, a folder (read-only unless uploads are allowed), or the viewer. */
 export function SharePage() {
   const { token } = useParams<{ token: string }>();
   const [{ datei }] = useQueryStates({ datei: parseAsString });
@@ -235,5 +286,5 @@ export function SharePage() {
   if (data.locked) return <CodeForm token={token} email={data.email} />;
   if (data.kind === "file") return <Viewer id={data.rootId} source={shareSource(token)} canGoBack={false} />;
   if (datei) return <Viewer key={datei} id={datei} source={shareSource(token)} />;
-  return <SharedFolder token={token} name={data.name} rootId={data.rootId} expiresOn={data.expiresOn} />;
+  return <SharedFolder token={token} name={data.name} rootId={data.rootId} expiresOn={data.expiresOn} canUpload={data.canUpload} />;
 }

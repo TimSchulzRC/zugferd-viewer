@@ -1,17 +1,21 @@
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { sql } from "kysely";
 import { devCode } from "@/lib/dev";
-import type { Crumb, FileDetails, Listing, Share, ShareInfo } from "@/lib/nodes";
+import type { Crumb, FileDetails, Listing, Node, Share, ShareInfo } from "@/lib/nodes";
 import { db } from "./db";
 import { env } from "./env";
 import { HttpError } from "./http";
 import { sendShareCode, sendShareInvitation } from "./mail";
-import { children, content, details, find, pathTo, requireAccess, zipSegmentSql } from "./nodes";
+import { children, content, details, find, freeName, pathTo, requireAccess, store, toNode, uploadName, zipSegmentSql } from "./nodes";
+import { deleteObjects } from "./storage";
 
 /*
  * A share gives one outside person read access to a folder or file. The link alone is not enough:
  * the visitor asks for a code, the app mails it to the address the share was made for, and only
  * the code unlocks the link in that browser. A forwarded link is useless without that mailbox.
+ *
+ * The owner of a shared folder can also let the visitor upload files into it. They only add: a
+ * visitor never renames, moves, deletes or replaces anything, and never creates folders.
  */
 
 type Row = {
@@ -26,6 +30,7 @@ type Row = {
   code_hash: string | null;
   code_sent_at: Date | null;
   code_attempts: number;
+  can_upload: boolean;
 };
 
 const CODE_MINUTES = 10;
@@ -33,6 +38,9 @@ const CODE_ATTEMPTS = 5;
 const RESEND_SECONDS = 60;
 /** How long a confirmed browser keeps access before it needs a new code. */
 const SESSION_HOURS = 24;
+/** What one link may upload in 24 hours, so a leaked mailbox cannot fill the storage. */
+const UPLOAD_FILES_PER_DAY = 200;
+const UPLOAD_BYTES_PER_DAY = 1024 * 1024 * 1024;
 
 /** Every query reads the date as text, because pg turns a date column into a Date at local midnight. */
 function shares() {
@@ -48,6 +56,7 @@ function shares() {
       "share.code_hash",
       "share.code_sent_at",
       "share.code_attempts",
+      "share.can_upload",
       "user.email as created_by",
       sql<string | null>`to_char(share.expires_on, 'YYYY-MM-DD')`.as("expires_on"),
       sql<boolean>`coalesce(share.expires_on < current_date, false)`.as("expired"),
@@ -61,6 +70,7 @@ function toShare(row: Row): Share {
     email: row.email,
     expiresOn: row.expires_on,
     expired: row.expired,
+    canUpload: row.can_upload,
     createdAt: row.created_at.toISOString(),
     createdBy: row.created_by,
   };
@@ -106,6 +116,16 @@ export async function createShare(nodeId: string, options: { email: string; expi
     await db().deleteFrom("share").where("id", "=", id).execute();
     throw new HttpError(502, "Die E-Mail konnte nicht gesendet werden");
   });
+  return toShare((await shares().where("share.id", "=", id).executeTakeFirstOrThrow()) as Row);
+}
+
+/** Allows or stops uploads through a link. Only links to a folder can allow them. */
+export async function updateShare(userId: string, id: string, changes: { canUpload: boolean }): Promise<Share> {
+  const share = await db().selectFrom("share").select("node_id").where("id", "=", id).executeTakeFirst();
+  if (!share) throw new HttpError(404, "Nicht gefunden");
+  const { row: node } = await requireAccess(userId, share.node_id, "owner");
+  if (changes.canUpload && node.kind !== "folder") throw new HttpError(400, "Hochladen geht nur in einen Ordner");
+  await db().updateTable("share").set({ can_upload: changes.canUpload }).where("id", "=", id).execute();
   return toShare((await shares().where("share.id", "=", id).executeTakeFirstOrThrow()) as Row);
 }
 
@@ -161,7 +181,7 @@ export async function info(token: string, request: Request): Promise<ShareInfo> 
   const share = await lookup(token);
   if (!isUnlocked(share, request)) return { locked: true, email: maskEmail(share.email) };
   const node = await find(share.node_id);
-  return { locked: false, kind: node.kind, name: node.name, rootId: node.id, expiresOn: share.expires_on };
+  return { locked: false, kind: node.kind, name: node.name, rootId: node.id, expiresOn: share.expires_on, canUpload: node.kind === "folder" && share.can_upload };
 }
 
 /** Mails a fresh code to the share's address. The visitor never names the address, so the code cannot go anywhere else. */
@@ -267,4 +287,76 @@ export async function sharedTree(share: Row, ids: string[]) {
   const found = new Set(rows.flatMap((row) => (row.start ? [row.start] : [])));
   if (ids.some((id) => !found.has(id))) throw new HttpError(404, "Nicht gefunden");
   return rows.map(({ kind, path, storage_key, updated_at }) => ({ kind, path, storage_key, updated_at }));
+}
+
+/**
+ * Whether the visitor may upload into this folder right now: the link still exists, has not
+ * expired and allows uploads, the folder lies inside the shared one, and the link's daily limit is
+ * not reached. Returns the folder's owner, who will own the file.
+ */
+async function uploadCheck(executor: ReturnType<typeof db>, shareId: string, folderId: string, bytes: number, lock: boolean) {
+  const share = await (lock ? executor.selectFrom("share").forShare() : executor.selectFrom("share"))
+    .select(["node_id", "can_upload"])
+    .where("id", "=", shareId)
+    // eb.or brackets the "or". As raw SQL without brackets it would also match every other link.
+    .where((eb) => eb.or([eb("expires_on", "is", null), eb("expires_on", ">=", sql<string>`current_date`)]))
+    .executeTakeFirst();
+  if (!share) throw new HttpError(404, "Diesen Link gibt es nicht oder er ist abgelaufen");
+  if (!share.can_upload) throw new HttpError(403, "Hochladen ist für diesen Link nicht freigegeben");
+  const { rows } = await sql<{ kind: "folder" | "file"; owner_id: string; inside: boolean }>`
+    with recursive up as (
+      select id, parent_id from node where id = ${folderId}
+      union all
+      select n.id, n.parent_id from node n join up on n.id = up.parent_id
+    ) cycle id set is_cycle using visited
+    select kind, owner_id, exists (select 1 from up where id = ${share.node_id}) as inside from node where id = ${folderId}
+  `.execute(executor);
+  const folder = rows[0];
+  if (!folder?.inside) throw new HttpError(404, "Nicht gefunden");
+  if (folder.kind !== "folder") throw new HttpError(400, "Kein Ordner");
+  const { rows: used } = await sql<{ files: number; bytes: string }>`
+    select count(*)::int as files, coalesce(sum(size), 0)::bigint as bytes from node
+    where uploaded_via = ${shareId} and created_at > now() - interval '24 hours'
+  `.execute(executor);
+  if (used[0].files >= UPLOAD_FILES_PER_DAY || Number(used[0].bytes) + bytes > UPLOAD_BYTES_PER_DAY) {
+    throw new HttpError(429, "Über diesen Link wurde heute schon zu viel hochgeladen. Bitte morgen weitermachen.");
+  }
+  return folder.owner_id;
+}
+
+/** A visitor uploads a file into the shared folder or a folder inside it. */
+export async function sharedUpload(share: Row, parentId: string | null, file: File): Promise<Node> {
+  const folderId = parentId ?? share.node_id;
+  const name = uploadName(file);
+  await uploadCheck(db(), share.id, folderId, file.size, false);
+
+  const stored = await store(file, name);
+  try {
+    // Checked again after the slow part, while moves in this owner's files wait (see move in
+    // nodes.ts) and the link cannot change: it may have been stopped or the folder moved out meanwhile.
+    const id = await db()
+      .transaction()
+      .execute(async (trx) => {
+        const folder = await trx.selectFrom("node").select("owner_id").where("id", "=", folderId).executeTakeFirst();
+        if (!folder) throw new HttpError(404, "Nicht gefunden");
+        // Everything below one link belongs to one owner, so this also makes parallel uploads through
+        // the link take turns, and the daily limit holds for them.
+        await sql`select pg_advisory_xact_lock(hashtext(${`move:${folder.owner_id}`}))`.execute(trx);
+        const ownerId = await uploadCheck(trx, share.id, folderId, stored.size, true);
+        if (ownerId !== folder.owner_id) throw new HttpError(409, "Bitte noch einmal versuchen");
+        const row = await trx
+          .insertInto("node")
+          .values({ ...stored, parent_id: folderId, name: await freeName(folderId, ownerId, name, trx), created_by: null, uploaded_via: share.id, owner_id: ownerId })
+          .returning("id")
+          .executeTakeFirstOrThrow();
+        return row.id;
+      });
+    const row = await find(id);
+    const node = toNode({ ...row, profile: row.report?.profile ?? null });
+    return { ...node, parentId: relativeParent(share, node) };
+  } catch (error) {
+    // A file nobody can reach is clutter.
+    await deleteObjects([stored.storage_key]).catch((cleanup) => console.error("Removing an unused upload failed", cleanup));
+    throw error;
+  }
 }

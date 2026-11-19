@@ -66,10 +66,15 @@ export const shareSchema = z.object({
   /** Last day the link works, YYYY-MM-DD, or null for no end. */
   expiresOn: z.string().nullable(),
   expired: z.boolean(),
+  /** The person may upload files into the shared folder. Only folders can allow it. */
+  canUpload: z.boolean(),
   createdAt: z.string(),
   createdBy: z.string().nullable(),
 });
 export type Share = z.infer<typeof shareSchema>;
+
+/** What the owner can change on an existing link. */
+export const shareUpdateSchema = z.object({ canUpload: z.boolean() });
 
 export const newShareSchema = z.object({
   email: z.email("Das ist keine E-Mail-Adresse").transform((email) => email.trim().toLowerCase()),
@@ -80,7 +85,14 @@ export const newShareSchema = z.object({
 export const shareInfoSchema = z.discriminatedUnion("locked", [
   /** The recipient's address, shortened, so they know which mailbox to check. */
   z.object({ locked: z.literal(true), email: z.string() }),
-  z.object({ locked: z.literal(false), kind: z.enum(["folder", "file"]), name: z.string(), rootId: z.string(), expiresOn: z.string().nullable() }),
+  z.object({
+    locked: z.literal(false),
+    kind: z.enum(["folder", "file"]),
+    name: z.string(),
+    rootId: z.string(),
+    expiresOn: z.string().nullable(),
+    canUpload: z.boolean().default(false),
+  }),
 ]);
 export type ShareInfo = z.infer<typeof shareInfoSchema>;
 

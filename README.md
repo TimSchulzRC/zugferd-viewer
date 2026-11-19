@@ -9,7 +9,7 @@ Ablage und Prüfung für ZUGFeRD-, Factur-X- und XRechnung-Dateien (PDF oder XML
 - **IDocs und andere Textdateien.** Neben Rechnungen nimmt die Ablage jede Textdatei an, etwa die Quellnachricht, aus der ein Mapping die Rechnung erzeugt hat. Siehe unten.
 - **Nutzer.** Anmeldung per E-Mail-Code oder Microsoft. Wer sich anmelden darf, bestimmen Administratoren per Einladung.
 - **Eigene Ablage.** Jeder Nutzer sieht nur seine eigenen Ordner und Dateien. Teilen lässt sich mit allen Nutzern oder ausgewählten, zum Ansehen oder Bearbeiten. Siehe unten.
-- **Teilen mit Externen.** Ordner oder einzelne Dateien für eine Person außerhalb freigeben, wahlweise mit Ablaufdatum. Siehe unten.
+- **Teilen mit Externen.** Ordner oder einzelne Dateien für eine Person außerhalb freigeben, wahlweise mit Ablaufdatum. In einen geteilten Ordner darf sie auf Wunsch auch hochladen. Siehe unten.
 
 ## Aufbau
 
@@ -86,7 +86,7 @@ pnpm test:access                    # Adresse aus .env.local (PUBLIC_URL, sonst 
 pnpm test:access http://host:3001   # oder ausdrücklich
 ```
 
-Das Skript lädt die Demo-Nutzer `anna@demo.test`, `ben@demo.test` und `carla@demo.test` ein, baut über die echte API ein Szenario auf (privat, für alle zum Ansehen, für Ben zum Bearbeiten) und prüft gut 60 Fälle: wer was sieht, wer was ändern darf, fremde IDs, Ändern und Entfernen von Freigaben, Übergabe beim Löschen eines Nutzers. Danach bleibt das Szenario stehen; das Skript nennt am Ende, was jede Person beim Durchklicken sehen sollte. Jeder Lauf räumt die Demo-Daten des letzten Laufs vorher ab.
+Das Skript lädt die Demo-Nutzer `anna@demo.test`, `ben@demo.test` und `carla@demo.test` ein, baut über die echte API ein Szenario auf (privat, für alle zum Ansehen, für Ben zum Bearbeiten) und prüft gut 100 Fälle: wer was sieht, wer was ändern darf, fremde IDs, Ändern und Entfernen von Freigaben, Hochladen über einen Link, Übergabe beim Löschen eines Nutzers. Danach bleibt das Szenario stehen; das Skript nennt am Ende, was jede Person beim Durchklicken sehen sollte. Jeder Lauf räumt die Demo-Daten des letzten Laufs vorher ab.
 
 ## IDocs und andere Textdateien
 
@@ -117,6 +117,7 @@ Rechtsklick auf einen Ordner oder eine Datei, „Teilen“, E-Mail-Adresse eintr
 
 - Links verschicken kann nur, wem der Ordner oder die Datei gehört.
 - Externe können ansehen (PDF, Rechnungsdaten, Prüfergebnis) und herunterladen. Ändern, verschieben, löschen, erneut prüfen oder weiter teilen können sie nichts; sie haben kein Konto und erreichen keine andere API als `/api/s/<token>`.
+- Bei einem Link auf einen Ordner lässt sich im Teilen-Dialog jederzeit „Darf Dateien hochladen“ an- und ausschalten. Dann lädt die Person Dateien in den Ordner und seine Unterordner. Sie gehören der Besitzerin des Ordners und werden wie jeder Upload geprüft. Vorhandenes ersetzt sie nie (gleicher Name wird „Name (2)“), Ordner legt sie keine an. Pro Link gehen höchstens 200 Dateien und 1 GB in 24 Stunden.
 - Ein Link sieht nur den freigegebenen Ordner und was darin liegt. Ein Link-Symbol in der Dateiliste zeigt, was geteilt ist, ein Klick darauf öffnet die Liste der Freigaben. Löschen beendet den Zugriff sofort.
 - Codes gelten 10 Minuten, einmal, mit höchstens 5 Versuchen; ein neuer Code geht frühestens nach einer Minute raus. Die Datenbank speichert Codes und Sitzungen nur als HMAC mit `BETTER_AUTH_SECRET`.
 - Was heruntergeladen ist, kann die Person natürlich weitergeben. Das verhindert keine Software.

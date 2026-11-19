@@ -48,19 +48,22 @@ export const api = {
   revalidate: (id: string) => request(fileSchema, `/api/nodes/${id}/validate`, { method: "POST" }),
   shares: (nodeId: string) => request(z.array(shareSchema), `/api/nodes/${nodeId}/shares`),
   createShare: (nodeId: string, options: { email: string; expiresOn?: string | null }) => request(shareSchema, `/api/nodes/${nodeId}/shares`, json("POST", options)),
+  updateShare: (id: string, changes: { canUpload: boolean }) => request(shareSchema, `/api/shares/${id}`, json("PATCH", changes)),
   deleteShare: (id: string) => request(ok, `/api/shares/${id}`, { method: "DELETE" }),
   permissions: (nodeId: string) => request(z.array(permissionSchema), `/api/nodes/${nodeId}/permissions`),
   grant: (nodeId: string, input: { userId: string | null; canEdit: boolean }) => request(permissionSchema, `/api/nodes/${nodeId}/permissions`, json("POST", input)),
   revoke: (id: string) => request(ok, `/api/permissions/${id}`, { method: "DELETE" }),
   colleagues: () => request(z.array(colleagueSchema), "/api/users"),
   invite: (email: string) => request(ok, "/api/users/invite", json("POST", { email })),
-  upload: (parentId: string | null, file: File) => {
-    const body = new FormData();
-    body.set("file", file);
-    if (parentId) body.set("parentId", parentId);
-    return request(nodeSchema, "/api/nodes/upload", { method: "POST", body });
-  },
+  upload: (parentId: string | null, file: File) => request(nodeSchema, "/api/nodes/upload", uploadBody(parentId, file)),
 };
+
+function uploadBody(parentId: string | null, file: File): RequestInit {
+  const body = new FormData();
+  body.set("file", file);
+  if (parentId) body.set("parentId", parentId);
+  return { method: "POST", body };
+}
 
 /** Starts a browser download: the file itself for one file, a zip for several or for folders. */
 export function download(ids: string[], base = "/api") {
@@ -80,6 +83,8 @@ export function shareApi(token: string) {
     unlock: (code: string) => request(ok, `${base}/unlock`, json("POST", { code }), false),
     list: (parentId: string | null) => request(listingSchema, `${base}/nodes${parentId ? `?parent=${parentId}` : ""}`, undefined, false),
     file: (id: string) => request(fileSchema, `${base}/nodes/${id}`, undefined, false),
+    /** Only works when the owner allowed uploads for this link; the server checks. */
+    upload: (parentId: string | null, file: File) => request(nodeSchema, `${base}/upload`, uploadBody(parentId, file), false),
   };
 }
 

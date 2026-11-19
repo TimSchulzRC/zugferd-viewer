@@ -18,6 +18,8 @@ type NodeTable = {
   status: NodeStatus | null;
   report: Report | null;
   created_by: string | null;
+  /** The link an outside person uploaded this file through, if they did. */
+  uploaded_via: string | null;
   /** Whose files these are. A node belongs to the owner of its top folder; see nodes.ts. */
   owner_id: string;
   created_at: Generated<Date>;
@@ -43,6 +45,8 @@ type ShareTable = {
   code_hash: string | null;
   code_sent_at: Date | null;
   code_attempts: Generated<number>;
+  /** Whether the visitor may upload files into the shared folder. Never set for a shared file. */
+  can_upload: Generated<boolean>;
   created_by: string | null;
   created_at: Generated<Date>;
 };
@@ -103,6 +107,10 @@ export async function migrateAppTables(adminEmail: string) {
   `.execute(db());
   await sql`create index if not exists share_node on share (node_id)`.execute(db());
   await migrateOwners(adminEmail);
+  // Links stay read-only until the owner allows uploads. Files keep their link's id for the daily limit.
+  await sql`alter table share add column if not exists can_upload boolean not null default false`.execute(db());
+  await sql`alter table node add column if not exists uploaded_via uuid references share(id) on delete set null`.execute(db());
+  await sql`create index if not exists node_uploaded_via on node (uploaded_via, created_at) where uploaded_via is not null`.execute(db());
 }
 
 /**
