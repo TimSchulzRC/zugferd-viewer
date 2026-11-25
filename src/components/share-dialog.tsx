@@ -14,6 +14,9 @@ import { api, shareUrl } from "@/lib/api";
 import type { Node, Permission, Share } from "@/lib/nodes";
 import { cn } from "@/lib/utils";
 
+/** The dialog needs no more than this, so the folder you are in can be shared without its row. */
+export type Shareable = Pick<Node, "id" | "kind" | "name">;
+
 const dayFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium" });
 
 /** navigator.clipboard only exists on https and localhost; over plain http on the LAN the old way still works. */
@@ -177,7 +180,7 @@ function PermissionRow({ permission, onChange, onDelete }: { permission: Permiss
 }
 
 /** Sharing with people who have an account: everyone, or chosen colleagues, to view or to edit. */
-function Colleagues({ node }: { node: Node }) {
+function Colleagues({ node }: { node: Shareable }) {
   const queryClient = useQueryClient();
   const permissions = useQuery({ queryKey: ["permissions", node.id], queryFn: () => api.permissions(node.id) });
   const colleagues = useQuery({ queryKey: ["colleagues"], queryFn: api.colleagues });
@@ -249,7 +252,7 @@ function Colleagues({ node }: { node: Node }) {
   );
 }
 
-export function ShareDialog({ node, onClose }: { node: Node; onClose: () => void }) {
+export function ShareDialog({ node, onClose }: { node: Shareable; onClose: () => void }) {
   const queryClient = useQueryClient();
   const shares = useQuery({ queryKey: ["shares", node.id], queryFn: () => api.shares(node.id) });
   const [email, setEmail] = useState("");
