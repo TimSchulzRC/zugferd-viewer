@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { EditableName, RenameInput } from "@/components/editable-name";
 import { MoveDialog } from "@/components/move-dialog";
-import { ShareDialog } from "@/components/share-dialog";
+import { ShareDialog, type Shareable } from "@/components/share-dialog";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -80,7 +80,7 @@ export function FileManager() {
   const [sort, setSort] = useState<{ key: SortKey; descending: boolean }>({ key: "name", descending: false });
   const [deleting, setDeleting] = useState<Node[] | null>(null);
   const [moving, setMoving] = useState<Node[] | null>(null);
-  const [sharing, setSharing] = useState<Node | null>(null);
+  const [sharing, setSharing] = useState<Shareable | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [marquee, setMarquee] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -316,6 +316,9 @@ export function FileManager() {
   const path = listing.data?.path ?? [];
   const crumbs = [{ id: null as string | null, name: ROOT_NAME }, ...path];
   const single = selection.length === 1 ? selection[0] : null;
+  // Only the owner shares, as with rows. The root has no crumb, so nothing to share there.
+  const current = path.at(-1);
+  const here: Shareable | null = current && folderAccess === "owner" ? { ...current, kind: "folder" } : null;
 
   return (
     <main className="flex h-dvh flex-col">
@@ -408,6 +411,11 @@ export function FileManager() {
         ) : (
           canAdd && (
             <>
+              {here && (
+                <Button variant="outline" size="sm" onClick={() => setSharing(here)}>
+                  <Share2 /> Teilen
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={() => createFolder.mutate()}>
                 <FolderPlus /> Neuer Ordner
               </Button>
@@ -612,6 +620,14 @@ export function FileManager() {
               <ContextMenuItem onClick={() => fileInput.current?.click()}>
                 <Upload /> Dateien hochladen
               </ContextMenuItem>
+              {here && (
+                <>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem onClick={() => setSharing(here)}>
+                    <Share2 /> „{here.name}“ teilen
+                  </ContextMenuItem>
+                </>
+              )}
             </>
             )
           ) : (
