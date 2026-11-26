@@ -1,7 +1,8 @@
+import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
 import { getMigrations } from "better-auth/db/migration";
 import { nextCookies } from "better-auth/next-js";
-import { admin, emailOTP } from "better-auth/plugins";
+import { admin, emailOTP, jwt } from "better-auth/plugins";
 import { defaultAc, userAc } from "better-auth/plugins/admin/access";
 import { headers } from "next/headers";
 import { migrateAppTables, pool } from "./db";
@@ -11,6 +12,14 @@ import { sendLoginCode } from "./mail";
 import { handOver } from "./nodes";
 import { checkBucket } from "./storage";
 
+/** What an MCP client asks for: reading what the user sees in the app. */
+export const MCP_SCOPE = "files:read";
+
+/** The MCP server's address. Access tokens name it as their audience, so they open nothing else. */
+export function mcpUrl() {
+  return `${env().APP_URL}/api/mcp`;
+}
+
 function create() {
   const { APP_URL, BETTER_AUTH_SECRET } = env();
   const ms = microsoft();
@@ -18,6 +27,8 @@ function create() {
     baseURL: APP_URL,
     secret: BETTER_AUTH_SECRET,
     database: pool(),
+    // The JWT plugin's /token hands out a JWT for the session. Only OAuth access tokens may be JWTs here.
+    disabledPaths: ["/token"],
     // Nobody signs up on their own. An admin invites, which creates the user (see inviteUser).
     socialProviders: ms ? { microsoft: { ...ms, prompt: "select_account", disableSignUp: true } } : {},
     account: {
@@ -70,6 +81,27 @@ function create() {
           admin: defaultAc.newRole({ user: ["list", "get", "set-role", "ban", "delete"], session: [] }),
           user: userAc,
         },
+      }),
+      // Signs the access tokens of the MCP server (see oauthProvider).
+      jwt({ disableSettingJwtHeader: true }),
+      /*
+       * Claude Code and other MCP clients sign in as the user: the client registers itself, the user
+       * signs in on /login as usual and agrees on /zugriff, and the client receives a token for the
+       * MCP server only. The server acts with exactly the user's rights (see app/api/mcp).
+       */
+      oauthProvider({
+        loginPage: "/login",
+        consentPage: "/zugriff",
+        allowDynamicClientRegistration: true,
+        allowUnauthenticatedClientRegistration: true,
+        // Claude Code registers a callback on localhost without naming an application type.
+        clientRegistrationDefaultApplicationType: "infer",
+        // Tokens always stand for a person; client_credentials would issue one for the client alone.
+        grantTypes: ["authorization_code", "refresh_token"],
+        resources: [mcpUrl()],
+        clientRegistrationDefaultResources: [mcpUrl()],
+        // No OpenID scopes: with them a token would also open Better Auth's userinfo, not only the MCP server.
+        scopes: [MCP_SCOPE, "offline_access"],
       }),
       nextCookies(),
     ],

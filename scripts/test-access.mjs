@@ -10,6 +10,7 @@
  * Demo users: anna@demo.test, ben@demo.test, carla@demo.test. dora@demo.test is created and
  * removed again in every run. Each run first deletes what the demo users own, then starts fresh.
  */
+import { createHash, randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 
@@ -495,6 +496,211 @@ heading("10. Nutzer entfernen: der Admin übernimmt die Dateien");
   check("Darin liegt »Dora Projekt«", !!handed && names(await admin.list(handed.id)).includes("Dora Projekt"));
   check("Doras Freigabe für Carla bleibt bestehen", names(await carla.root()).includes("Dora Projekt"));
   check("Doras Sitzung ist ungültig", (await dora.root()).status === 401);
+}
+
+heading("11. MCP-Server: Claude sieht genau, was die Person sieht, und ändert nichts");
+{
+  const MCP = `${BASE}/api/mcp`;
+  const REDIRECT = "http://127.0.0.1:33418/callback";
+  const base64url = (bytes) => Buffer.from(bytes).toString("base64url");
+  // A browser gets a redirect. Node's fetch always says sec-fetch-mode: cors, so Better Auth answers it like its client: { redirect, url }.
+  const location = (response) => response.headers?.location ?? response.data?.url ?? "";
+
+  /** One MCP call, as Claude Code sends it. */
+  async function mcp(token, method, params = {}) {
+    const response = await fetch(MCP, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...(token && { authorization: `Bearer ${token}` }) },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+    });
+    const text = await response.text();
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {}
+    return { status: response.status, data, headers: Object.fromEntries(response.headers) };
+  }
+  async function callTool(token, name, args = {}) {
+    const { data } = await mcp(token, "tools/call", { name, arguments: args });
+    const result = data?.result;
+    const text = result?.content?.[0]?.text ?? "";
+    let value = null;
+    try {
+      value = JSON.parse(text);
+    } catch {}
+    return { error: result?.isError ? text : null, value };
+  }
+
+  /** Session.fetch, but keeping the Location header of redirects. A browser's navigation sends no Origin. */
+  async function raw(session, path, options = {}) {
+    const headers = { ...(options.method && { origin: BASE }), cookie: [...session.cookies].map(([k, v]) => `${k}=${v}`).join("; "), ...options.headers };
+    const response = await fetch(path.startsWith("http") ? path : BASE + path, { ...options, headers, redirect: "manual" });
+    for (const line of response.headers.getSetCookie()) {
+      const [pair] = line.split(";");
+      session.cookies.set(pair.slice(0, pair.indexOf("=")), pair.slice(pair.indexOf("=") + 1));
+    }
+    const text = await response.text();
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {}
+    return { status: response.status, data, headers: Object.fromEntries(response.headers) };
+  }
+
+  /**
+   * The whole flow Claude Code runs: discovery, registration, sign-in on /login with the mailed code,
+   * consent on /zugriff, code for token. Returns the access token or throws with the step that failed.
+   */
+  async function connect(email, { resource = MCP } = {}) {
+    const challenge = await mcp(null, "initialize");
+    const metadataUrl = /resource_metadata="([^"]+)"/.exec(challenge.headers["www-authenticate"] ?? "")?.[1];
+    if (challenge.status !== 401 || !metadataUrl) throw new Error(`MCP ohne Token: HTTP ${challenge.status}, kein resource_metadata`);
+    const resourceMetadata = await (await fetch(metadataUrl)).json();
+    const issuer = new URL(resourceMetadata.authorization_servers[0]);
+    const server = await (await fetch(`${issuer.origin}/.well-known/oauth-authorization-server${issuer.pathname}`)).json();
+
+    const registered = await fetch(server.registration_endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ client_name: "Claude Code (test)", redirect_uris: [REDIRECT], token_endpoint_auth_method: "none", grant_types: ["authorization_code", "refresh_token"], response_types: ["code"] }),
+    });
+    const client = await registered.json();
+    if (!client.client_id) throw new Error(`Registrierung: HTTP ${registered.status} ${JSON.stringify(client)}`);
+
+    const verifier = base64url(randomBytes(32));
+    const authorize = new URL(server.authorization_endpoint);
+    for (const [key, value] of Object.entries({
+      response_type: "code",
+      client_id: client.client_id,
+      redirect_uri: REDIRECT,
+      scope: "files:read offline_access",
+      state: "s1",
+      code_challenge: base64url(createHash("sha256").update(verifier).digest()),
+      code_challenge_method: "S256",
+      ...(resource && { resource }),
+    }))
+      authorize.searchParams.set(key, value);
+
+    const browser = new Session(email);
+    const toLogin = await raw(browser, authorize.toString());
+    const login = new URL(location(toLogin), BASE);
+    if (login.pathname !== "/login") throw new Error(`Authorize ohne Sitzung: HTTP ${toLogin.status} → ${location(toLogin)}`);
+    const oauthQuery = login.search.slice(1);
+    await must(await raw(browser, "/api/auth/email-otp/send-verification-otp", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, type: "sign-in" }) }), "Code anfordern");
+    const signedIn = await raw(browser, "/api/auth/sign-in/email-otp", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, otp: "000000", oauth_query: oauthQuery }) });
+    const consentUrl = new URL(signedIn.data?.url ?? "", BASE);
+    if (consentUrl.pathname !== "/zugriff") throw new Error(`Nach der Anmeldung: HTTP ${signedIn.status} ${JSON.stringify(signedIn.data)}`);
+    const consented = await raw(browser, "/api/auth/oauth2/consent", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accept: true, oauth_query: consentUrl.search.slice(1) }) });
+    const back = new URL(consented.data?.url ?? "", BASE);
+    const code = back.searchParams.get("code");
+    if (!back.href.startsWith(REDIRECT) || !code) throw new Error(`Zustimmung: HTTP ${consented.status} ${JSON.stringify(consented.data)}`);
+
+    const tokens = await (
+      await fetch(server.token_endpoint, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: REDIRECT, client_id: client.client_id, code_verifier: verifier, ...(resource && { resource }) }),
+      })
+    ).json();
+    if (!tokens.access_token) throw new Error(`Token: ${JSON.stringify(tokens)}`);
+    const { aud } = JSON.parse(Buffer.from(tokens.access_token.split(".")[1] ?? "", "base64url").toString() || "{}");
+    if (resource && JSON.stringify([aud].flat()) !== JSON.stringify([MCP])) throw new Error(`Token gilt nicht nur für den MCP-Server: aud ${JSON.stringify(aud)}`);
+    return tokens.access_token;
+  }
+
+  /** Every file a person reaches by clicking through the app, as "folder path / name". */
+  async function reachable(session) {
+    const files = new Map();
+    const walk = async (listing, prefix) => {
+      for (const item of listing.data?.items ?? []) {
+        if (item.kind === "file") files.set(item.id, `${prefix}${item.name}`);
+        else await walk(await session.list(item.id), `${prefix}${item.name} / `);
+      }
+    };
+    await walk(await session.root(), "");
+    return files;
+  }
+
+  const tokens = {};
+  for (const session of [anna, ben, carla]) {
+    try {
+      tokens[session.email] = await connect(session.email);
+      check(`${session.email} verbindet sich wie Claude Code (Registrierung, Anmeldung mit Code, Zustimmung, Token)`, true);
+    } catch (error) {
+      check(`${session.email} verbindet sich wie Claude Code`, false, error.message);
+    }
+  }
+
+  const tools = await mcp(tokens[ANNA], "tools/list");
+  const toolNames = (tools.data?.result?.tools ?? []).map((tool) => tool.name).sort();
+  check("Es gibt nur lesende Werkzeuge", toolNames.join(",") === "find_files,get_file,list_folder,read_file", toolNames.join(", ") || JSON.stringify(tools.data));
+  check("Alle als nur lesend markiert", (tools.data?.result?.tools ?? []).every((tool) => tool.annotations?.readOnlyHint === true));
+
+  for (const session of [anna, ben, carla]) {
+    const token = tokens[session.email];
+    const top = await callTool(token, "list_folder");
+    const app = names(await session.root()).sort();
+    const viaMcp = (top.value?.items ?? []).map((item) => item.name).sort();
+    check(`${session.email}: oberste Ebene im MCP = in der App`, JSON.stringify(viaMcp) === JSON.stringify(app), `MCP ${viaMcp.join(", ")} | App ${app.join(", ")}`);
+    const expected = await reachable(session);
+    const found = await callTool(token, "find_files", { limit: 100 });
+    const foundIds = new Set((found.value ?? []).map((file) => file.id));
+    const missing = [...expected].filter(([id]) => !foundIds.has(id)).map(([, path]) => path);
+    const extra = (found.value ?? []).filter((file) => !expected.has(file.id)).map((file) => `${file.folder} / ${file.name}`);
+    check(`${session.email}: find_files findet genau die ${expected.size} Dateien, die in der App erreichbar sind`, expected.size < 100 && !missing.length && !extra.length, `fehlt: ${missing.join(", ") || "-"} | zu viel: ${extra.join(", ") || "-"}`);
+  }
+
+  {
+    const own = await callTool(tokens[ANNA], "get_file", { fileId: alleFile.id });
+    check("Anna: get_file liefert den Prüfbericht", own.value?.file?.name === "rechnung-alle.xml" && Array.isArray(own.value?.validation?.findings), own.error ?? JSON.stringify(own.value).slice(0, 200));
+    const content = await callTool(tokens[ANNA], "read_file", { fileId: alleFile.id });
+    check("Anna: read_file liefert den Inhalt", content.value?.text?.includes("<ram:ID>rechnung-alle.xml</ram:ID>"), content.error ?? JSON.stringify(content.value).slice(0, 200));
+    const part = await callTool(tokens[ANNA], "read_file", { fileId: alleFile.id, offset: 10, maxChars: 20 });
+    check("read_file liest in Teilen weiter", part.value?.text?.length === 20 && part.value?.nextOffset === 30, JSON.stringify(part.value));
+  }
+  for (const [label, token, fileId] of [
+    ["Anna liest Bens private Datei nicht", tokens[ANNA], benFile.id],
+    ["Carla liest »Anna für Ben« nicht", tokens[CARLA], fuerBenFile.id],
+  ]) {
+    const file = await callTool(token, "get_file", { fileId });
+    const content = await callTool(token, "read_file", { fileId });
+    check(`${label}: get_file und read_file → Nicht gefunden`, file.error === "Nicht gefunden" && content.error === "Nicht gefunden", `${file.error} / ${content.error}`);
+  }
+  {
+    const listing = await callTool(tokens[CARLA], "list_folder", { folderId: fuerBen.id });
+    const search = await callTool(tokens[CARLA], "find_files", { folderId: fuerBen.id });
+    check("Carla listet und durchsucht »Anna für Ben« nicht", listing.error === "Nicht gefunden" && search.error === "Nicht gefunden", `${listing.error} / ${search.error}`);
+    const below = await callTool(tokens[CARLA], "find_files", { folderId: alle.id });
+    const belowNames = (below.value ?? []).map((file) => file.name).sort();
+    check("Carla findet unter »Anna für alle« beide Dateien, auch im Unterordner", belowNames.join(",") === "rechnung-alle.xml,rechnung-unterordner.xml", belowNames.join(", "));
+    const inSub = (below.value ?? []).find((file) => file.id === unterFile.id);
+    check("Der Pfad beginnt bei dem, was mit Carla geteilt ist", inSub?.folder === "Anna für alle (ansehen) / Unterordner", inSub?.folder);
+  }
+
+  {
+    const noToken = await mcp(null, "tools/list");
+    check("Ohne Token → 401 mit Verweis auf die Anmeldung", noToken.status === 401 && /resource_metadata=/.test(noToken.headers["www-authenticate"] ?? ""), `HTTP ${noToken.status}`);
+    const forged = await mcp(`${tokens[ANNA]?.slice(0, -4)}AAAA`, "tools/list");
+    check("Verfälschtes Token → 401", forged.status === 401, `HTTP ${forged.status}`);
+    const cookie = await fetch(MCP, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream", cookie: [...anna.cookies].map(([k, v]) => `${k}=${v}`).join("; ") },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+    check("Die Sitzung der App allein reicht nicht → 401", cookie.status === 401, `HTTP ${cookie.status}`);
+    let opaque = null;
+    try {
+      opaque = await connect(ANNA, { resource: null });
+    } catch (error) {
+      check("Token ohne resource holen", false, error.message);
+    }
+    if (opaque) check("Token, das nicht für den MCP-Server ausgestellt ist → 401", (await mcp(opaque, "tools/list")).status === 401);
+    const banned = await admin.fetch("/api/auth/admin/ban-user", { method: "POST", json: { userId: CARLA_ID } });
+    check("Admin sperrt Carla", banned.status === 200, `HTTP ${banned.status}`);
+    check("Gesperrt: Carlas Token gilt nicht mehr → 401", (await mcp(tokens[CARLA], "tools/list")).status === 401);
+    await must(await admin.fetch("/api/auth/admin/unban-user", { method: "POST", json: { userId: CARLA_ID } }), "Entsperren");
+    check("Entsperrt: Carlas Token gilt wieder", (await mcp(tokens[CARLA], "tools/list")).status === 200);
+  }
 }
 
 const failed = results.filter((r) => !r.ok);

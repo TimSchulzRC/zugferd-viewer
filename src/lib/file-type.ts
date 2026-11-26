@@ -19,6 +19,9 @@ export const FILE_TYPE_LABELS: Record<Exclude<FileType, "invoice">, string> = {
 
 const HEAD = 8192;
 
+/** Names the standards prescribe for the invoice embedded in a PDF, most recent first. */
+export const EMBEDDED_INVOICE_NAMES = ["factur-x.xml", "xrechnung.xml", "zugferd-invoice.xml", "order-x.xml"];
+
 export function isPdf(bytes: Uint8Array): boolean {
   return new TextDecoder("latin1").decode(bytes.subarray(0, 1024)).includes("%PDF-");
 }
