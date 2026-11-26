@@ -633,7 +633,7 @@ heading("11. MCP-Server: Claude sieht genau, was die Person sieht, und ändert n
 
   const tools = await mcp(tokens[ANNA], "tools/list");
   const toolNames = (tools.data?.result?.tools ?? []).map((tool) => tool.name).sort();
-  check("Es gibt nur lesende Werkzeuge", toolNames.join(",") === "find_files,get_file,list_folder,read_file", toolNames.join(", ") || JSON.stringify(tools.data));
+  check("Es gibt nur lesende Werkzeuge und das Prüfen ohne Speichern", toolNames.join(",") === "find_files,get_file,list_folder,read_file,validate_file", toolNames.join(", ") || JSON.stringify(tools.data));
   check("Alle als nur lesend markiert", (tools.data?.result?.tools ?? []).every((tool) => tool.annotations?.readOnlyHint === true));
 
   for (const session of [anna, ben, carla]) {
@@ -657,6 +657,36 @@ heading("11. MCP-Server: Claude sieht genau, was die Person sieht, und ändert n
     check("Anna: read_file liefert den Inhalt", content.value?.text?.includes("<ram:ID>rechnung-alle.xml</ram:ID>"), content.error ?? JSON.stringify(content.value).slice(0, 200));
     const part = await callTool(tokens[ANNA], "read_file", { fileId: alleFile.id, offset: 10, maxChars: 20 });
     check("read_file liest in Teilen weiter", part.value?.text?.length === 20 && part.value?.nextOffset === 30, JSON.stringify(part.value));
+  }
+  {
+    // What Anna reaches before, to show validate_file adds nothing to her files.
+    const before = JSON.stringify([...(await reachable(anna)).keys()].sort());
+    const xml = invoice("mcp-pruefung.xml");
+    const asText = await callTool(tokens[ANNA], "validate_file", { name: "mcp-pruefung.xml", content: xml });
+    check(
+      "validate_file prüft XML aus content und liefert den Bericht, ohne zu speichern",
+      asText.value?.stored === false && typeof asText.value?.validation?.valid === "boolean" && asText.value.validation.findings.length > 0 && !!asText.value.status,
+      asText.error ?? JSON.stringify(asText.value).slice(0, 200),
+    );
+    const asBase64 = await callTool(tokens[ANNA], "validate_file", { name: "mcp-pruefung.xml", contentBase64: Buffer.from(xml).toString("base64") });
+    check("validate_file prüft dieselbe Datei als Base64 mit demselben Ergebnis", JSON.stringify(asBase64.value?.validation) === JSON.stringify(asText.value?.validation), asBase64.error ?? "anderer Bericht");
+    const utf16 = await callTool(tokens[ANNA], "validate_file", { name: "mcp-pruefung.xml", content: xml.replace('encoding="UTF-8"', 'encoding="UTF-16"') });
+    check("Text mit encoding=\"UTF-16\" in der Deklaration gibt denselben Bericht", JSON.stringify(utf16.value?.validation) === JSON.stringify(asText.value?.validation), utf16.error ?? utf16.value?.validation?.findings?.[0]?.message);
+    const after = JSON.stringify([...(await reachable(anna)).keys()].sort());
+    check("Danach hat Anna keine Datei mehr oder weniger, in keinem Ordner", before === after);
+    const found = await callTool(tokens[ANNA], "find_files", { name: "mcp-pruefung" });
+    check("find_files findet die geprüfte Datei nicht", Array.isArray(found.value) && found.value.length === 0, JSON.stringify(found.value));
+    for (const [label, args, expected] of [
+      ["ohne Inhalt", { name: "x.xml" }, "Entweder content oder contentBase64 angeben"],
+      ["mit content und contentBase64", { content: xml, contentBase64: "PA==" }, "Entweder content oder contentBase64 angeben"],
+      ["mit kaputtem Base64", { contentBase64: "kein base64!" }, "contentBase64 ist kein gültiges Base64"],
+      ["mit einer CSV statt einer Rechnung", { name: "liste.csv", content: "a;b\n1;2\n" }, "Nur Rechnungen lassen sich prüfen"],
+    ]) {
+      const refused = await callTool(tokens[ANNA], "validate_file", args);
+      check(`validate_file ${label} → ${expected}`, refused.error === expected, refused.error ?? JSON.stringify(refused.value).slice(0, 200));
+    }
+    const noToken = await mcp(null, "tools/call", { name: "validate_file", arguments: { content: xml } });
+    check("validate_file ohne Token → 401", noToken.status === 401, `HTTP ${noToken.status}`);
   }
   for (const [label, token, fileId] of [
     ["Anna liest Bens private Datei nicht", tokens[ANNA], benFile.id],

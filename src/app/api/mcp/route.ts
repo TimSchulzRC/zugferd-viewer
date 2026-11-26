@@ -1,6 +1,6 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { checkOrigin, HttpError } from "@/server/http";
-import { mcpServer } from "@/server/mcp";
+import { MAX_REQUEST_BYTES, mcpServer } from "@/server/mcp";
 import { mcpUser } from "@/server/oauth";
 
 /**
@@ -12,7 +12,8 @@ export async function POST(request: Request) {
     checkOrigin(request);
     const user = await mcpUser(request);
     if (user instanceof Response) return user;
-    const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    // The SDK's limit of 4 MiB would turn away a PDF of about 3 MB sent to validate_file as base64.
+    const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true, maxRequestBodySize: MAX_REQUEST_BYTES });
     await mcpServer(user.id, user.email).connect(transport);
     return await transport.handleRequest(request);
   } catch (error) {
