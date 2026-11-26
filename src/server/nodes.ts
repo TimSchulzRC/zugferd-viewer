@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { sql } from "kysely";
 import { fileType, isPdf, type FileType } from "@/lib/file-type";
 import { MAX_FILE_BYTES, nameSchema, type Access, type Crumb, type FileDetails, type Folder, type Listing, type Node } from "@/lib/nodes";
-import { db } from "./db";
+import { db, type NodeStatus } from "./db";
 import { HttpError } from "./http";
 import { deleteObjects, getObject, putObject } from "./storage";
 import { statusOf, validate } from "./validate";
@@ -169,7 +169,7 @@ export async function pathTo(id: string | null): Promise<Crumb[]> {
 }
 
 /** The path as the user sees it: someone else's folders start at the top-most folder shared with them. */
-async function visiblePath(userId: string, id: string | null, ownerId: string): Promise<Crumb[]> {
+export async function visiblePath(userId: string, id: string | null, ownerId: string): Promise<Crumb[]> {
   const path = await pathTo(id);
   if (ownerId === userId || !path.length) return path;
   const granted = await db()
@@ -279,6 +279,49 @@ export async function fileFor(userId: string, id: string): Promise<FileDetails> 
   // The viewer's back button goes to the parent, which must be a folder the user can see.
   const node = { ...toUserNode(listed, userId, access), parentId: path.at(-1)?.id ?? null };
   return { node, path, report: row.report };
+}
+
+export type FileFilter = { folderId?: string; name?: string; status?: NodeStatus | "unchecked"; type?: FileType; limit: number };
+
+/**
+ * Files the user can see, newest first: their own, and everything inside what is shared with them.
+ * With folderId only those below that folder. For the MCP server, which has no file tree to click through.
+ */
+export async function findFor(userId: string, filter: FileFilter): Promise<{ node: Node; path: Crumb[] }[]> {
+  let start;
+  if (filter.folderId) {
+    const { row } = await requireAccess(userId, filter.folderId, "view");
+    if (row.kind !== "folder") throw new HttpError(400, "Ziel ist kein Ordner");
+    start = sql`select id from node where parent_id = ${filter.folderId}`;
+  } else {
+    start = sql`select id from node where owner_id = ${userId} union select node_id from permission where ${forUser(userId)}`;
+  }
+  const { rows: found } = await sql<{ id: string }>`
+    with recursive visible as (
+      select id from (${start}) as seeds
+      union
+      select n.id from node n join visible on n.parent_id = visible.id
+    )
+    select n.id from node n join visible on visible.id = n.id
+    where n.kind = 'file'
+      ${filter.name ? sql`and n.name ilike ${`%${filter.name.replace(/[\\%_]/g, "\\$&")}%`}` : sql``}
+      ${filter.status === "unchecked" ? sql`and n.status is null and coalesce(n.type, 'invoice') = 'invoice'` : filter.status ? sql`and n.status = ${filter.status}` : sql``}
+      ${filter.type ? sql`and coalesce(n.type, 'invoice') = ${filter.type}` : sql``}
+    order by n.updated_at desc, n.name
+    limit ${filter.limit}
+  `.execute(db());
+  if (!found.length) return [];
+  const listed = await rows(userId).where("node.id", "in", found.map((row) => row.id)).orderBy("node.updated_at", "desc").orderBy("node.name").execute();
+  const results = await Promise.all(
+    listed.map(async (row) => {
+      // Checked again: a share may have ended since the search.
+      const { access } = await accessTo(userId, row.id);
+      if (!access) return null;
+      const path = await visiblePath(userId, row.parent_id, row.owner_id);
+      return { node: { ...toUserNode(row, userId, access), parentId: path.at(-1)?.id ?? null }, path };
+    }),
+  );
+  return results.filter((result) => result !== null);
 }
 
 /** "Rechnung.pdf" becomes "Rechnung (2).pdf" if the folder already has one. Top levels are per owner. */

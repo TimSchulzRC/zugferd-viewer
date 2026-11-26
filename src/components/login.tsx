@@ -24,6 +24,14 @@ function MicrosoftLogo() {
   );
 }
 
+/**
+ * An MCP client such as Claude Code sends the user here with a signed OAuth request in the address.
+ * Signing in then continues that request, and Better Auth answers with where to go next.
+ */
+function inOAuthFlow() {
+  return new URLSearchParams(window.location.search).has("sig");
+}
+
 export function Login() {
   // `error` is set by Better Auth when the Microsoft account belongs to nobody who was invited.
   const [query] = useQueryStates({ email: parseAsString.withDefault(""), error: parseAsString });
@@ -35,7 +43,7 @@ export function Login() {
   // Someone already signed in who lands here (an old tab, a bookmark) goes straight to the files.
   const session = authClient.useSession();
   useEffect(() => {
-    if (session.data) reload("/");
+    if (session.data && !inOAuthFlow()) reload("/");
   }, [session.data]);
   const config = useQuery({ queryKey: ["config"], queryFn: () => fetch("/api/config").then((r) => r.json() as Promise<{ microsoft: boolean }>) });
 
@@ -60,7 +68,8 @@ export function Login() {
       setCode("");
       return setError(result.error.code === "TOO_MANY_ATTEMPTS" ? "Zu viele Versuche. Fordere einen neuen Code an." : "Der Code stimmt nicht.");
     }
-    reload("/");
+    const next = (result.data as { url?: unknown } | null)?.url;
+    reload(inOAuthFlow() && typeof next === "string" ? next : "/");
   };
 
   const microsoft = () => authClient.signIn.social({ provider: "microsoft", callbackURL: "/", errorCallbackURL: "/login" });

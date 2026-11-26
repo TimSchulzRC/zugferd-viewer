@@ -26,7 +26,7 @@ function failure(error: unknown): Response {
  * Browsers send Origin with every POST, PATCH and DELETE. One that names another host is a forged
  * request from another site, even a sibling subdomain that SameSite cookies would let through.
  */
-function checkOrigin(request: Request) {
+export function checkOrigin(request: Request) {
   if (request.method === "GET" || request.method === "HEAD") return;
   const origin = request.headers.get("origin");
   if (!origin) return;

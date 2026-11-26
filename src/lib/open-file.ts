@@ -1,4 +1,4 @@
-import { decodeText, isPdf, type FileType } from "./file-type";
+import { decodeText, EMBEDDED_INVOICE_NAMES, isPdf, type FileType } from "./file-type";
 
 export type OpenedFile = {
   file: File;
@@ -10,9 +10,6 @@ export type OpenedFile = {
   text: string | null;
 };
 
-// Names the standards prescribe for the embedded invoice, most recent first.
-const KNOWN_NAMES = ["factur-x.xml", "xrechnung.xml", "zugferd-invoice.xml", "order-x.xml"];
-
 async function embeddedXml(bytes: ArrayBuffer): Promise<string | null> {
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
@@ -20,7 +17,7 @@ async function embeddedXml(bytes: ArrayBuffer): Promise<string | null> {
   try {
     const pdf = await task.promise;
     const attachments = [...((await pdf.getAttachments()) ?? [])].filter(([, a]) => a.filename.toLowerCase().endsWith(".xml"));
-    const invoice = attachments.find(([, a]) => KNOWN_NAMES.includes(a.filename.toLowerCase())) ?? attachments[0];
+    const invoice = attachments.find(([, a]) => EMBEDDED_INVOICE_NAMES.includes(a.filename.toLowerCase())) ?? attachments[0];
     if (!invoice) return null;
     const [id, attachment] = invoice;
     const content = attachment.content ?? (await pdf.getAttachmentContent(id));
