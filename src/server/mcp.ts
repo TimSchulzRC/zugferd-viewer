@@ -2,16 +2,19 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { decodeText, FILE_TYPE_LABELS, FILE_TYPES, isPdf } from "@/lib/file-type";
-import type { Crumb, Node } from "@/lib/nodes";
-import { describeProfile, formatOf, offersXRechnung, reportFor, RULESETS } from "@/lib/report";
+import { MAX_FILE_BYTES, type Crumb, type Node } from "@/lib/nodes";
+import { describeProfile, formatOf, offersXRechnung, reportFor, RULESETS, type Report, type Ruleset } from "@/lib/report";
 import { HttpError } from "./http";
-import { contentFor, fileFor, findFor, list } from "./nodes";
+import { contentFor, fileFor, findFor, list, validateUnstored } from "./nodes";
 import { embeddedXml } from "./pdf";
+import { statusOf } from "./validate";
 
 /*
  * The MCP server for Claude Code and other MCP clients. It only reads, and every tool goes through
  * the same access checks as the app's own API with the id of the signed-in user, so a client sees
  * exactly what that person sees in the app and nothing more. See app/api/mcp/route.ts for sign-in.
+ * validate_file is the one tool that takes a file in: it checks it and returns the report, but
+ * stores neither, so it changes nothing in anyone's files either.
  */
 
 const STATUS_TEXT: Record<NonNullable<Node["status"]>, string> = {
@@ -22,6 +25,10 @@ const STATUS_TEXT: Record<NonNullable<Node["status"]>, string> = {
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
 const MAX_CHARS = 200_000;
+/** A file of MAX_FILE_BYTES as base64, which validate_file accepts. */
+const MAX_BASE64_CHARS = Math.ceil(MAX_FILE_BYTES / 3) * 4;
+/** The largest MCP request: a validate_file call with a file of MAX_FILE_BYTES, plus room for the JSON around it. */
+export const MAX_REQUEST_BYTES = MAX_BASE64_CHARS + 1024 * 1024;
 
 function pathText(path: Crumb[]) {
   return path.length ? path.map((crumb) => crumb.name).join(" / ") : "(top level)";
@@ -47,6 +54,27 @@ function describe(node: Node) {
   };
 }
 
+/** A report as get_file and validate_file return it, read with the ruleset where the profile offers a choice. */
+function validation(report: Report, ruleset: Ruleset) {
+  const choosable = offersXRechnung(report);
+  return {
+    ruleset: choosable ? ruleset : "zugferd",
+    xrechnungRulesetAvailable: choosable,
+    profileName: describeProfile(report.profile)?.name ?? null,
+    ...reportFor(report, choosable ? ruleset : "zugferd"),
+  };
+}
+
+/** The bytes of a file passed to validate_file, either as text or as base64. */
+function passedBytes({ content, contentBase64 }: { content?: string; contentBase64?: string }) {
+  if ((content === undefined) === (contentBase64 === undefined)) throw new HttpError(400, "Entweder content oder contentBase64 angeben");
+  // Text arrives decoded and goes out as UTF-8, so a declaration naming another encoding would mislead the validator.
+  if (content !== undefined) return new TextEncoder().encode(content.replace(/^(﻿?<\?xml[^>]*?\sencoding\s*=\s*)(["'])[^"']*\2/, "$1$2UTF-8$2"));
+  const clean = contentBase64!.replace(/\s+/g, "");
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(clean) || clean.length % 4 === 1) throw new HttpError(400, "contentBase64 ist kein gültiges Base64");
+  return new Uint8Array(Buffer.from(clean, "base64"));
+}
+
 function json(value: unknown): CallToolResult {
   return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
 }
@@ -70,7 +98,7 @@ export function mcpServer(userId: string, email: string) {
   const server = new McpServer(
     { name: "zugferd-viewer", version: "1.0.0" },
     {
-      instructions: `Read-only access to the files of ${email} in ZUGFeRD Viewer: e-invoices (ZUGFeRD/Factur-X PDFs, XRechnung and other CII or UBL XML), IDocs, EDIFACT, CSV, JSON and text files, with the stored result of the Mustang validator for each invoice. You see exactly what this person sees in the app: their own folders and what others shared with them. Nothing can be changed here. Start with list_folder or find_files, then get_file for the validation report and read_file for the content.`,
+      instructions: `Read-only access to the files of ${email} in ZUGFeRD Viewer: e-invoices (ZUGFeRD/Factur-X PDFs, XRechnung and other CII or UBL XML), IDocs, EDIFACT, CSV, JSON and text files, with the stored result of the Mustang validator for each invoice. You see exactly what this person sees in the app: their own folders and what others shared with them. Nothing in these files can be changed here. Start with list_folder or find_files, then get_file for the validation report and read_file for the content. validate_file checks an invoice you pass in (for example a local file) with the same validator and stores neither the file nor the result.`,
     },
   );
 
@@ -119,20 +147,9 @@ export function mcpServer(userId: string, email: string) {
       inputSchema: { fileId: id, ruleset: z.enum(RULESETS).default("zugferd") },
       annotations: READ_ONLY,
     },
-    tool(async ({ fileId, ruleset }: { fileId: string; ruleset: (typeof RULESETS)[number] }) => {
+    tool(async ({ fileId, ruleset }: { fileId: string; ruleset: Ruleset }) => {
       const { node, path, report } = await fileFor(userId, fileId);
-      const choosable = offersXRechnung(report);
-      return {
-        file: describe(node),
-        folder: pathText(path),
-        folderId: node.parentId,
-        validation: report && {
-          ruleset: choosable ? ruleset : "zugferd",
-          xrechnungRulesetAvailable: choosable,
-          profileName: describeProfile(report.profile)?.name ?? null,
-          ...reportFor(report, choosable ? ruleset : "zugferd"),
-        },
-      };
+      return { file: describe(node), folder: pathText(path), folderId: node.parentId, validation: report && validation(report, ruleset) };
     }),
   );
 
@@ -171,6 +188,37 @@ export function mcpServer(userId: string, email: string) {
       const part = text.slice(offset, offset + maxChars);
       const end = offset + part.length;
       return { name, source, totalChars: text.length, offset, ...(end < text.length && { nextOffset: end }), text: part };
+    }),
+  );
+
+  server.registerTool(
+    "validate_file",
+    {
+      title: "Validate an invoice without storing it",
+      description:
+        "Checks an e-invoice you pass in (ZUGFeRD/Factur-X PDF, XRechnung or other CII or UBL XML) with the same Mustang validator as the app and returns the report in the shape of get_file. Neither the file nor the report is stored: nothing appears in the user's folders and nothing there changes. Pass XML as text in content, or any file (a PDF must) base64-encoded in contentBase64, up to 50 MB. ruleset 'xrechnung' reads the report as an XRechnung check, like in get_file.",
+      inputSchema: {
+        name: z.string().min(1).max(255).default("rechnung").describe("File name, e.g. rechnung.xml; it appears in the validator's messages"),
+        content: z.string().max(MAX_FILE_BYTES).optional().describe("The file as text, for XML"),
+        contentBase64: z.string().max(MAX_BASE64_CHARS).optional().describe("The file base64-encoded, for a PDF or any file"),
+        ruleset: z.enum(RULESETS).default("zugferd"),
+      },
+      // Reads nothing of the user's and writes nothing anywhere; the same file gives the same report.
+      annotations: READ_ONLY,
+    },
+    tool(async ({ name, ruleset, ...passed }: { name: string; content?: string; contentBase64?: string; ruleset: Ruleset }) => {
+      const bytes = passedBytes(passed);
+      const report = await validateUnstored(bytes, name);
+      const status = statusOf(report);
+      return {
+        name,
+        size: bytes.byteLength,
+        stored: false,
+        format: formatOf(report.profile) ?? describeProfile(report.profile)?.name ?? null,
+        status,
+        statusText: STATUS_TEXT[status],
+        validation: validation(report, ruleset),
+      };
     }),
   );
 

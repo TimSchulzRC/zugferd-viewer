@@ -71,7 +71,7 @@ export function Consent() {
                 Dateien und ihre Prüfergebnisse.
               </p>
               <p className="text-muted-foreground">
-                Ändern, hochladen oder löschen kann die Anwendung nichts.
+                Ändern, hochladen oder löschen kann die Anwendung nichts. Sie darf Rechnungen, die sie selbst mitbringt, prüfen lassen; die werden nirgends gespeichert.
                 {session.data && <> Angemeldet als {session.data.user.email}.</>}
                 {target && <> Danach geht es weiter zu {target}.</>}
               </p>

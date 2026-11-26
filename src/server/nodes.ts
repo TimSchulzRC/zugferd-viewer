@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { sql } from "kysely";
 import { fileType, isPdf, type FileType } from "@/lib/file-type";
 import { MAX_FILE_BYTES, nameSchema, type Access, type Crumb, type FileDetails, type Folder, type Listing, type Node } from "@/lib/nodes";
+import type { Report } from "@/lib/report";
 import { db, type NodeStatus } from "./db";
 import { HttpError } from "./http";
 import { deleteObjects, getObject, putObject } from "./storage";
@@ -433,6 +434,21 @@ export async function revalidate(userId: string, id: string): Promise<FileDetail
     .where("id", "=", id)
     .execute();
   return fileFor(userId, id);
+}
+
+/**
+ * Validates a file that is not in anyone's files, for the MCP tool validate_file. Neither the file
+ * nor its report is stored, so this needs no access to any folder.
+ */
+export async function validateUnstored(bytes: Uint8Array, name: string): Promise<Report> {
+  if (bytes.byteLength > MAX_FILE_BYTES) throw new HttpError(413, "Datei ist größer als 50 MB");
+  const type = fileType(bytes, name);
+  if (!type) throw new HttpError(415, "Nur PDF- und Textdateien");
+  if (type !== "invoice") throw new HttpError(400, "Nur Rechnungen lassen sich prüfen");
+  return validate(bytes, validatorName(bytes, name)).catch((error) => {
+    console.error(`Validating ${name} without storing it failed`, error);
+    throw new HttpError(502, "Validator nicht erreichbar");
+  });
 }
 
 export async function rename(userId: string, id: string, name: string): Promise<Node> {

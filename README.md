@@ -10,7 +10,7 @@ Ablage und Prüfung für ZUGFeRD-, Factur-X- und XRechnung-Dateien (PDF oder XML
 - **Nutzer.** Anmeldung per E-Mail-Code oder Microsoft. Wer sich anmelden darf, bestimmen Administratoren per Einladung.
 - **Eigene Ablage.** Jeder Nutzer sieht nur seine eigenen Ordner und Dateien. Teilen lässt sich mit allen Nutzern oder ausgewählten, zum Ansehen oder Bearbeiten. Siehe unten.
 - **Teilen mit Externen.** Ordner oder einzelne Dateien für eine Person außerhalb freigeben, wahlweise mit Ablaufdatum. In einen geteilten Ordner darf sie auf Wunsch auch hochladen. Siehe unten.
-- **Zugriff für Claude Code (MCP).** Claude liest Dateien, Rechnungs-XML und Prüfergebnisse mit genau den Rechten der angemeldeten Person, ändern kann es nichts. Siehe unten.
+- **Zugriff für Claude Code (MCP).** Claude liest Dateien, Rechnungs-XML und Prüfergebnisse mit genau den Rechten der angemeldeten Person und kann eigene Rechnungen prüfen lassen, ohne dass sie gespeichert werden. Ändern kann es nichts. Siehe unten.
 
 ## Aufbau
 
@@ -87,7 +87,7 @@ pnpm test:access                    # Adresse aus .env.local (PUBLIC_URL, sonst 
 pnpm test:access http://host:3001   # oder ausdrücklich
 ```
 
-Das Skript lädt die Demo-Nutzer `anna@demo.test`, `ben@demo.test` und `carla@demo.test` ein, baut über die echte API ein Szenario auf (privat, für alle zum Ansehen, für Ben zum Bearbeiten) und prüft gut 130 Fälle: wer was sieht, wer was ändern darf, fremde IDs, Ändern und Entfernen von Freigaben, Hochladen über einen Link, Übergabe beim Löschen eines Nutzers, und ob der MCP-Server jeder Person genau das zeigt, was sie in der App erreicht. Danach bleibt das Szenario stehen; das Skript nennt am Ende, was jede Person beim Durchklicken sehen sollte. Jeder Lauf räumt die Demo-Daten des letzten Laufs vorher ab.
+Das Skript lädt die Demo-Nutzer `anna@demo.test`, `ben@demo.test` und `carla@demo.test` ein, baut über die echte API ein Szenario auf (privat, für alle zum Ansehen, für Ben zum Bearbeiten) und prüft gut 140 Fälle: wer was sieht, wer was ändern darf, fremde IDs, Ändern und Entfernen von Freigaben, Hochladen über einen Link, Übergabe beim Löschen eines Nutzers, und ob der MCP-Server jeder Person genau das zeigt, was sie in der App erreicht, und beim Prüfen ohne Speichern nichts ablegt. Danach bleibt das Szenario stehen; das Skript nennt am Ende, was jede Person beim Durchklicken sehen sollte. Jeder Lauf räumt die Demo-Daten des letzten Laufs vorher ab.
 
 ## IDocs und andere Textdateien
 
@@ -128,9 +128,11 @@ Danach in Claude Code `/mcp` aufrufen und „zugferd“ anmelden. Der Browser ö
 | `find_files` | Dateien über alles hinweg, was die Person sieht, nach Name, Status oder Typ, auch nur unter einem Ordner |
 | `get_file` | Datei, Ordnerpfad und gespeicherter Prüfbericht mit allen Befunden, Regel-IDs, XPath und BT-Codes; wahlweise als XRechnung gelesen |
 | `read_file` | Inhalt als Text, bei einer PDF das eingebettete Rechnungs-XML, lange Dateien in Teilen |
+| `validate_file` | Prüft eine Rechnung, die Claude mitbringt (XML als Text, PDF oder XML als Base64, bis 50 MB), mit demselben Validator und liefert den Bericht wie `get_file`. Datei und Ergebnis werden nirgends gespeichert |
 
 - Jedes Werkzeug geht durch dieselben Zugriffsprüfungen wie die App, mit der ID der angemeldeten Person. Claude sieht also eigene Ordner und was andere mit ihr teilen, sonst nichts, auch bei Admins.
-- Nur lesen: Hochladen, Ändern, Löschen, Teilen und „Erneut prüfen“ gibt es über MCP nicht.
+- Nur lesen: Hochladen, Ändern, Löschen, Teilen und „Erneut prüfen“ gibt es über MCP nicht. `validate_file` schickt die Datei nur an den Validator; sie landet in keinem Ordner, weder in der Datenbank noch im Speicher, und braucht deshalb auch keine Rechte an einem Ordner.
+- Eine MCP-Anfrage darf bis rund 71 MB groß sein (statt der 4 MiB, die das SDK sonst zulässt), damit eine 50-MB-Datei als Base64 hineinpasst.
 - Sperrt ein Admin die Person oder entfernt sie, gilt ihr Token sofort nicht mehr.
 - Better Auth ist dafür OAuth-Server (Plugin `@better-auth/oauth-provider`, Aussteller `<app>/api/auth`). Claude Code registriert sich beim ersten Mal selbst (Dynamic Client Registration); das legt nur einen Eintrag ohne Rechte an, Zugriff gibt es erst nach Anmeldung und Zustimmung.
 
