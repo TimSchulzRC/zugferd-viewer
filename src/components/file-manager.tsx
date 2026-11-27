@@ -53,7 +53,7 @@ export function formatSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toLocaleString("de-DE", { maximumFractionDigits: 1 })} MB`;
 }
 
-/** ZUGFeRD or XRechnung for an invoice, else what kind of file it is. */
+/** ZUGFeRD, XRechnung or Peppol for an invoice, else what kind of file it is. */
 function formatLabel(node: Node): string | null {
   return node.type && node.type !== "invoice" ? FILE_TYPE_LABELS[node.type] : formatOf(node.profile);
 }

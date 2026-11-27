@@ -3,7 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { decodeText, FILE_TYPE_LABELS, FILE_TYPES, isPdf } from "@/lib/file-type";
 import { MAX_FILE_BYTES, type Crumb, type Node } from "@/lib/nodes";
-import { describeProfile, formatOf, offersXRechnung, reportFor, RULESETS, type Report, type Ruleset } from "@/lib/report";
+import { describeProfile, formatOf, reportFor, rulesetFor, RULESETS, rulesetsFor, type Report, type Ruleset } from "@/lib/report";
 import { HttpError } from "./http";
 import { contentFor, fileFor, findFor, list, validateUnstored } from "./nodes";
 import { embeddedXml } from "./pdf";
@@ -54,14 +54,16 @@ function describe(node: Node) {
   };
 }
 
-/** A report as get_file and validate_file return it, read with the ruleset where the profile offers a choice. */
-function validation(report: Report, ruleset: Ruleset) {
-  const choosable = offersXRechnung(report);
+/** A report as get_file and validate_file return it, read with the ruleset where the report offers it. */
+function validation(report: Report, ruleset: Ruleset | undefined) {
+  const available = rulesetsFor(report);
+  const used = rulesetFor(report, ruleset);
   return {
-    ruleset: choosable ? ruleset : "zugferd",
-    xrechnungRulesetAvailable: choosable,
+    ruleset: used,
+    rulesetsAvailable: available,
+    xrechnungRulesetAvailable: available.includes("xrechnung"),
     profileName: describeProfile(report.profile)?.name ?? null,
-    ...reportFor(report, choosable ? ruleset : "zugferd"),
+    ...reportFor(report, used),
   };
 }
 
@@ -107,7 +109,7 @@ export function mcpServer(userId: string, email: string) {
     {
       title: "List a folder",
       description:
-        "Lists a folder's folders and files with their type, format (ZUGFeRD, XRechnung, IDoc, …) and validation status. Without folderId it lists the top level: the user's own folders and files plus what others shared with them.",
+        "Lists a folder's folders and files with their type, format (ZUGFeRD, XRechnung, Peppol, IDoc, …) and validation status. Without folderId it lists the top level: the user's own folders and files plus what others shared with them.",
       inputSchema: { folderId: id.optional().describe("Folder id from an earlier result; omit for the top level") },
       annotations: READ_ONLY,
     },
@@ -143,11 +145,11 @@ export function mcpServer(userId: string, email: string) {
     {
       title: "Get a file and its validation report",
       description:
-        "Returns a file's details and the stored Mustang validation report: overall result, PDF/A and XML result, the profile, and every finding with severity, rule id (e.g. BR-DE-15), message, XPath location and the business terms (BT-…) it concerns. ruleset 'xrechnung' reads the report as an XRechnung check (only offered for BASIC and EN 16931 profiles, like in the app).",
-      inputSchema: { fileId: id, ruleset: z.enum(RULESETS).default("zugferd") },
+        "Returns a file's details and the stored Mustang validation report: overall result, PDF/A and XML result, the profile, and every finding with severity, rule id (e.g. BR-DE-15), message, XPath location and the business terms (BT-…) it concerns. ruleset 'xrechnung' reads the report as an XRechnung check (only offered for BASIC and EN 16931 profiles, like in the app). ruleset 'slowakei' adds the Peppol BIS Billing rules with the Slovak rules SK-R-…, which Slovakia requires (only offered for UBL files checked since these rules came in). Without ruleset, files that declare Peppol BIS read as 'slowakei', all others as 'zugferd'.",
+      inputSchema: { fileId: id, ruleset: z.enum(RULESETS).optional() },
       annotations: READ_ONLY,
     },
-    tool(async ({ fileId, ruleset }: { fileId: string; ruleset: Ruleset }) => {
+    tool(async ({ fileId, ruleset }: { fileId: string; ruleset?: Ruleset }) => {
       const { node, path, report } = await fileFor(userId, fileId);
       return { file: describe(node), folder: pathText(path), folderId: node.parentId, validation: report && validation(report, ruleset) };
     }),
@@ -196,17 +198,17 @@ export function mcpServer(userId: string, email: string) {
     {
       title: "Validate an invoice without storing it",
       description:
-        "Checks an e-invoice you pass in (ZUGFeRD/Factur-X PDF, XRechnung or other CII or UBL XML) with the same Mustang validator as the app and returns the report in the shape of get_file. Neither the file nor the report is stored: nothing appears in the user's folders and nothing there changes. Pass XML as text in content, or any file (a PDF must) base64-encoded in contentBase64, up to 50 MB. ruleset 'xrechnung' reads the report as an XRechnung check, like in get_file.",
+        "Checks an e-invoice you pass in (ZUGFeRD/Factur-X PDF, XRechnung or other CII or UBL XML) with the same Mustang validator as the app and returns the report in the shape of get_file. Neither the file nor the report is stored: nothing appears in the user's folders and nothing there changes. Pass XML as text in content, or any file (a PDF must) base64-encoded in contentBase64, up to 50 MB. ruleset 'xrechnung' or 'slowakei' reads the report as an XRechnung or Slovak check, like in get_file.",
       inputSchema: {
         name: z.string().min(1).max(255).default("rechnung").describe("File name, e.g. rechnung.xml; it appears in the validator's messages"),
         content: z.string().max(MAX_FILE_BYTES).optional().describe("The file as text, for XML"),
         contentBase64: z.string().max(MAX_BASE64_CHARS).optional().describe("The file base64-encoded, for a PDF or any file"),
-        ruleset: z.enum(RULESETS).default("zugferd"),
+        ruleset: z.enum(RULESETS).optional(),
       },
       // Reads nothing of the user's and writes nothing anywhere; the same file gives the same report.
       annotations: READ_ONLY,
     },
-    tool(async ({ name, ruleset, ...passed }: { name: string; content?: string; contentBase64?: string; ruleset: Ruleset }) => {
+    tool(async ({ name, ruleset, ...passed }: { name: string; content?: string; contentBase64?: string; ruleset?: Ruleset }) => {
       const bytes = passedBytes(passed);
       const report = await validateUnstored(bytes, name);
       const status = statusOf(report);
