@@ -372,7 +372,7 @@ export async function sharedUpload(share: Row, parentId: string | null, file: Fi
         if (ownerId !== folder.owner_id) throw new HttpError(409, "Bitte noch einmal versuchen");
         const row = await trx
           .insertInto("node")
-          .values({ ...stored, parent_id: folderId, name: await freeName(folderId, ownerId, name, trx), created_by: null, uploaded_via: share.id, owner_id: ownerId })
+          .values({ ...stored, parent_id: folderId, name: await freeName(folderId, ownerId, name, trx), created_by: null, uploaded_via: share.id, uploaded_by: share.email, owner_id: ownerId })
           .returning("id")
           .executeTakeFirstOrThrow();
         return row.id;

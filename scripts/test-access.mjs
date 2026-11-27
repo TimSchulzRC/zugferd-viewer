@@ -315,6 +315,9 @@ let benUpload;
   check("Datei umbenennen", (await ben.rename(fuerBenFile.id, "rechnung-fuer-ben-umbenannt.xml")).status === 200);
   const annaSees = names(await anna.list(fuerBen.id));
   check("Anna sieht Bens Datei und Ordner", ["von-ben.xml", "Von Ben angelegt"].every((n) => annaSees.includes(n)), annaSees.join(", "));
+  check("Ben sieht: von ihm hochgeladen", uploaded.data?.uploadedByYou === true && uploaded.data?.uploadedBy === BEN, JSON.stringify(uploaded.data));
+  const fromBen = byName(await anna.list(fuerBen.id), "von-ben.xml");
+  check("Anna sieht: von Ben hochgeladen", fromBen?.uploadedBy === BEN && fromBen?.uploadedByYou === false, JSON.stringify(fromBen));
   check("Den geteilten Ordner selbst umbenennen → 403", ...statusIs(await ben.rename(fuerBen.id, "Meins"), 403));
   check("Den geteilten Ordner selbst löschen → 403", ...statusIs(await ben.remove([fuerBen.id]), 403));
   check("Weiter teilen → 403", ...statusIs(await ben.grant(fuerBen.id, CARLA_ID, false), 403));
@@ -415,6 +418,8 @@ heading("9. Personen außerhalb laden über einen Link hoch");
   check("Hochladen in den geteilten Ordner", up.status === 200 && up.data?.parentId === null, `HTTP ${up.status} ${JSON.stringify(up.data)}`);
   const annaSees = await anna.list(ziel.id);
   check("Anna sieht die Datei, sie gehört ihr", byName(annaSees, "vom-lieferanten.xml")?.access === "owner", names(annaSees).join(", "));
+  check("Anna sieht, wer über den Link hochgeladen hat", byName(annaSees, "vom-lieferanten.xml")?.uploadedBy === "lieferant@demo.test", JSON.stringify(byName(annaSees, "vom-lieferanten.xml")));
+  check("Die Person außerhalb sieht keine Adressen", up.data?.uploadedBy === null && byName(await visitor.list(null), "vom-lieferanten.xml")?.uploadedBy === null);
   check("Die Person sieht ihre Datei im Link", names(await visitor.list(null)).includes("vom-lieferanten.xml"));
   check("Hochladen in einen Unterordner des Links", (await visitor.upload(drin.id, "im-unterordner.xml")).status === 200);
   const again = await visitor.upload(null, "vorhanden.xml", "ersetzt?");
@@ -451,6 +456,7 @@ heading("9. Personen außerhalb laden über einen Link hoch");
   check("Link gelöscht: Hochladen → 404", ...statusIs(await visitor.upload(null, "zu-spaet.xml"), 404));
   const left = names(await anna.list(ziel.id));
   check("Was hochgeladen war, bleibt bei Anna", ["vom-lieferanten.xml", "vorhanden (2).xml", "notiz.txt"].every((n) => left.includes(n)), left.join(", "));
+  check("Link gelöscht: die Adresse dessen, der hochgeladen hat, bleibt", byName(await anna.list(ziel.id), "vom-lieferanten.xml")?.uploadedBy === "lieferant@demo.test");
 
   // 200 Dateien am Tag pro Link, auch wenn viele gleichzeitig ankommen.
   const flut = await must(await anna.folder(null, "Anna Tageslimit"), "Ordner anlegen");

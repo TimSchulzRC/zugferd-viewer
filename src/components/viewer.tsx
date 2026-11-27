@@ -94,6 +94,8 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
 
   const details = useQuery({ queryKey: [source.key, "file", id], queryFn: () => source.file(id) });
   const name = details.data?.node.name;
+  const node = details.data?.node;
+  const uploader = node?.uploadedByYou ? "Von dir hochgeladen" : node?.uploadedBy ? `Hochgeladen von ${node.uploadedBy}` : null;
   const type = details.data?.node.type ?? "invoice";
   const opened = useQuery({
     queryKey: [source.key, "content", id],
@@ -307,6 +309,11 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
             </EditableName>
           ) : (
             <p className="truncate text-sm font-medium">{name}</p>
+          )}
+          {uploader && (
+            <p className="hidden max-w-72 min-w-0 truncate pl-2 text-xs text-muted-foreground lg:block" title={uploader}>
+              {uploader}
+            </p>
           )}
         </div>
         <div className={cn("flex items-center gap-0.5 rounded-lg bg-muted p-[3px]", !isInvoice && "hidden")} role="group" aria-label="Bereiche">

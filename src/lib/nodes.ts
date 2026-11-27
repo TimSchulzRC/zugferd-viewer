@@ -31,6 +31,10 @@ export const nodeSchema = z.object({
   ownerId: z.string().default(""),
   /** The owner's address when that is someone else, shown next to what others shared with you. */
   owner: z.string().nullable().default(null),
+  /** For files, the address of whoever uploaded it, a colleague or someone outside through a link. Null for link visitors. */
+  uploadedBy: z.string().nullable().default(null),
+  /** Whether the signed-in user uploaded the file themselves. */
+  uploadedByYou: z.boolean().default(false),
 });
 export type Node = z.infer<typeof nodeSchema>;
 
