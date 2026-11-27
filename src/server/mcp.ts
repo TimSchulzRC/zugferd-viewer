@@ -47,6 +47,7 @@ function describe(node: Node) {
       status: node.status,
       statusText: node.status ? STATUS_TEXT[node.status] : node.type === "invoice" ? "not checked (the validator could not read it or was unavailable)" : "not an invoice, not checked",
       size: node.size,
+      uploadedBy: node.uploadedByYou ? "you" : node.uploadedBy,
     }),
     updatedAt: node.updatedAt,
     access: node.access,

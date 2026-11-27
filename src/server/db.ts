@@ -20,6 +20,11 @@ type NodeTable = {
   created_by: string | null;
   /** The link an outside person uploaded this file through, if they did. */
   uploaded_via: string | null;
+  /**
+   * The address of whoever uploaded the file: the user's, or the one the link was for. Kept as text,
+   * so it stays when the link or the account is deleted. Null for folders and where nobody knows.
+   */
+  uploaded_by: string | null;
   /** Whose files these are. A node belongs to the owner of its top folder; see nodes.ts. */
   owner_id: string;
   created_at: Generated<Date>;
@@ -111,6 +116,23 @@ export async function migrateAppTables(adminEmail: string) {
   await sql`alter table share add column if not exists can_upload boolean not null default false`.execute(db());
   await sql`alter table node add column if not exists uploaded_via uuid references share(id) on delete set null`.execute(db());
   await sql`create index if not exists node_uploaded_via on node (uploaded_via, created_at) where uploaded_via is not null`.execute(db());
+  await migrateUploader();
+}
+
+/**
+ * Files from before uploaded_by existed get the address from the account that uploaded them or the
+ * link they came through, as long as either is still there. Runs on every start; once filled, a
+ * file is left alone.
+ */
+async function migrateUploader() {
+  await sql`alter table node add column if not exists uploaded_by text`.execute(db());
+  await sql`
+    update node set uploaded_by = coalesce(
+      (select email from "user" where "user".id = node.created_by),
+      (select email from share where share.id = node.uploaded_via)
+    )
+    where kind = 'file' and uploaded_by is null and (created_by is not null or uploaded_via is not null)
+  `.execute(db());
 }
 
 /**

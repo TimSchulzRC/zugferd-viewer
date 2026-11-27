@@ -17,7 +17,7 @@ import { statusOf, validate } from "./validate";
  * (children, details, content, pathTo, tree) are for public links, which check access in shares.ts.
  */
 
-const COLUMNS = ["node.id", "node.parent_id", "node.kind", "node.name", "node.size", "node.type", "node.status", "node.updated_at", "node.owner_id"] as const;
+const COLUMNS = ["node.id", "node.parent_id", "node.kind", "node.name", "node.size", "node.type", "node.status", "node.updated_at", "node.owner_id", "node.created_by", "node.uploaded_by"] as const;
 /** Only the profile of the stored report, so listings don't load whole reports. */
 const PROFILE = sql<string | null>`node.report->>'profile'`.as("profile");
 type Row = {
@@ -31,6 +31,8 @@ type Row = {
   profile: string | null;
   updated_at: Date;
   owner_id: string;
+  created_by: string | null;
+  uploaded_by: string | null;
   owner_email?: string | null;
   shared?: boolean;
   /** The strongest permission the user holds on this very node: true edit, false view, null none. */
@@ -62,7 +64,7 @@ function grantOf(edit: boolean | null | undefined): Access | null {
   return edit === true ? "edit" : edit === false ? "view" : null;
 }
 
-/** A node as a public link visitor sees it: no owner, no sharing state. */
+/** A node as a public link visitor sees it: no owner, no sharing state, no uploader. */
 export function toNode(row: Row): Node {
   return {
     id: row.id,
@@ -79,6 +81,8 @@ export function toNode(row: Row): Node {
     access: "view",
     ownerId: "",
     owner: null,
+    uploadedBy: null,
+    uploadedByYou: false,
   };
 }
 
@@ -91,6 +95,8 @@ function toUserNode(row: Row, userId: string, inherited: Access | null): Node {
     access: mine ? "owner" : (stronger(inherited, grantOf(row.own_edit)) ?? "view"),
     ownerId: row.owner_id,
     owner: mine ? null : (row.owner_email ?? null),
+    uploadedBy: row.kind === "file" ? row.uploaded_by : null,
+    uploadedByYou: row.kind === "file" && row.created_by === userId,
   };
 }
 
@@ -411,7 +417,14 @@ export async function upload(userId: string, parentId: string | null, file: File
   const { ownerId } = await target(userId, parentId);
   const { id } = await db()
     .insertInto("node")
-    .values({ ...stored, parent_id: parentId, name: await freeName(parentId, ownerId, name), created_by: userId, owner_id: ownerId })
+    .values({
+      ...stored,
+      parent_id: parentId,
+      name: await freeName(parentId, ownerId, name),
+      created_by: userId,
+      uploaded_by: sql<string>`(select email from "user" where id = ${userId})`,
+      owner_id: ownerId,
+    })
     .returning("id")
     .executeTakeFirstOrThrow();
   return listed(userId, id);

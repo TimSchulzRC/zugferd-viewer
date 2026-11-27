@@ -28,17 +28,23 @@ const ROOT_NAME = "Rechnungen";
 /** How far the pointer has to travel before a press on empty space becomes a selection rectangle. */
 const MARQUEE_THRESHOLD = 5;
 
-type SortKey = "name" | "format" | "status" | "size" | "updatedAt";
+type SortKey = "name" | "format" | "status" | "size" | "updatedAt" | "uploadedBy";
 const COLUMNS: { key: SortKey; label: string; className: string }[] = [
   { key: "name", label: "Name", className: "" },
   { key: "format", label: "Format", className: "hidden @xl:flex" },
   { key: "status", label: "Prüfung", className: "" },
   { key: "size", label: "Größe", className: "justify-end text-right" },
   { key: "updatedAt", label: "Geändert", className: "hidden @2xl:flex" },
+  { key: "uploadedBy", label: "Hochgeladen von", className: "hidden @5xl:flex" },
 ];
 // The last column holds the sharing button.
 const GRID =
-  "grid grid-cols-[minmax(0,1fr)_9rem_5.5rem_1.5rem] @xl:grid-cols-[minmax(0,1fr)_5.5rem_9rem_5.5rem_1.5rem] @2xl:grid-cols-[minmax(0,1fr)_5.5rem_9rem_5.5rem_10rem_1.5rem] items-center gap-3 px-4";
+  "grid grid-cols-[minmax(0,1fr)_9rem_5.5rem_1.5rem] @xl:grid-cols-[minmax(0,1fr)_5.5rem_9rem_5.5rem_1.5rem] @2xl:grid-cols-[minmax(0,1fr)_5.5rem_9rem_5.5rem_10rem_1.5rem] @5xl:grid-cols-[minmax(0,1fr)_5.5rem_9rem_5.5rem_10rem_15rem_1.5rem] items-center gap-3 px-4";
+
+/** Who uploaded a file, as the list names it. */
+function uploaderLabel(node: Node): string | null {
+  return node.uploadedByYou ? "Du" : node.uploadedBy;
+}
 
 export const STATUS = {
   einvoice: { label: "E-Rechnung", icon: CircleCheck, color: "text-emerald-600" },
@@ -105,6 +111,7 @@ export function FileManager() {
       if (sort.key === "size") return ((a.size ?? 0) - (b.size ?? 0)) * direction || byName;
       if (sort.key === "updatedAt") return a.updatedAt.localeCompare(b.updatedAt) * direction || byName;
       if (sort.key === "format") return (formatLabel(a) ?? "").localeCompare(formatLabel(b) ?? "") * direction || byName;
+      if (sort.key === "uploadedBy") return (uploaderLabel(a) ?? "").localeCompare(uploaderLabel(b) ?? "", "de") * direction || byName;
       if (sort.key === "status") return (a.status ?? "").localeCompare(b.status ?? "") * direction || byName;
       return byName * direction;
     };
@@ -557,6 +564,9 @@ export function FileManager() {
                 </div>
                 <div className="text-right text-muted-foreground tabular-nums">{node.size !== null && formatSize(node.size)}</div>
                 <div className="hidden whitespace-nowrap text-muted-foreground @2xl:block">{dateFormat.format(new Date(node.updatedAt))}</div>
+                <div className="hidden truncate text-muted-foreground @5xl:block" title={node.uploadedBy ?? undefined}>
+                  {node.kind === "file" && (uploaderLabel(node) ?? "–")}
+                </div>
                 <div className="flex justify-end">
                   {node.shared && (
                     <button
