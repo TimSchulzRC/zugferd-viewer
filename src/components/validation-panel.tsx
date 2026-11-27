@@ -57,7 +57,7 @@ function FindingRow({ finding, onLocate }: { finding: Finding; onLocate?: () => 
 
 type Props = {
   validation: Validation;
-  /** The rules the report was read for. The verdict names XRechnung when it is not ZUGFeRD. */
+  /** The rules the report was read for. The verdict names XRechnung or Slovakia when it is not ZUGFeRD. */
   ruleset: Ruleset;
   /** Left out where the visitor cannot re-run the validator (public links). */
   onRetry?: () => void;
@@ -99,7 +99,11 @@ export function ValidationPanel({ validation, ruleset, onRetry, locate }: Props)
       ? report.valid
         ? { title: "Gültige XRechnung", tone: good, icon: CircleCheck }
         : { title: "Keine gültige XRechnung", tone: bad, icon: CircleX }
-      : eInvoice
+      : ruleset === "slowakei"
+        ? report.valid
+          ? { title: "Gültige E-Rechnung für die Slowakei", tone: good, icon: CircleCheck }
+          : { title: "Keine gültige E-Rechnung für die Slowakei", tone: bad, icon: CircleX }
+        : eInvoice
         ? { title: "Gültige E-Rechnung", tone: good, icon: CircleCheck }
         : report.valid
           ? { title: "Gültig, aber keine E-Rechnung", tone: "bg-amber-500/15 text-amber-800 dark:text-amber-300", icon: TriangleAlert }
@@ -121,6 +125,7 @@ export function ValidationPanel({ validation, ruleset, onRetry, locate }: Props)
             {!profile.en16931 && <span className="text-muted-foreground">erfüllt EN 16931 nicht</span>}
           </Check>
         )}
+        {ruleset === "slowakei" && report.peppol && <Check ok={report.peppol.valid}>Peppol-Regeln mit slowakischen Ergänzungen</Check>}
       </ul>
 
       {(["error", "warning", "notice"] as const).map((severity) => {

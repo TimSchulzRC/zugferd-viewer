@@ -1,6 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import { z } from "zod";
-import { describeProfile, type Finding, type Report } from "@/lib/report";
+import { describeProfile, type Finding, formatOf, type Report } from "@/lib/report";
 import { prefixFor, termsForFinding } from "@/lib/terms";
 import type { NodeStatus } from "./db";
 import { env } from "./env";
@@ -17,6 +17,7 @@ const mustangReport = z.object({
         info: z.looseObject({ profile: z.string().optional(), validator: z.looseObject({ "@version": z.string() }).optional() }).optional(),
       })
       .optional(),
+    peppol: z.looseObject({ "@rules": z.string(), summary: status }).optional(),
     summary: status,
   }),
 });
@@ -71,7 +72,10 @@ function collect(node: unknown, part: Finding["part"], out: Finding[]) {
   }
 }
 
-/** Sends the file to the Mustang service and turns its XML report into ours. Throws if the service fails. */
+/**
+ * Sends the file to the Mustang service and turns its XML report into ours. Throws if the service fails.
+ * For UBL files the service adds a <peppol> section with the Peppol BIS Billing rules.
+ */
 export async function validate(bytes: Uint8Array, name: string): Promise<Report> {
   const response = await fetch(`${env().VALIDATOR_URL}/validate`, {
     method: "POST",
@@ -85,6 +89,8 @@ export async function validate(bytes: Uint8Array, name: string): Promise<Report>
   collect(validation.pdf, "pdf", findings);
   collect(validation.xml, "xml", findings);
   collect(validation.messages, "file", findings);
+  const peppolFindings: Finding[] = [];
+  collect(validation.peppol, "xml", peppolFindings);
 
   return {
     valid: validation.summary["@status"] === "valid",
@@ -93,10 +99,14 @@ export async function validate(bytes: Uint8Array, name: string): Promise<Report>
     profile: validation.xml?.info?.profile?.trim() || null,
     validator: `Mustang ${validation.xml?.info?.validator?.["@version"] ?? ""}`.trim(),
     findings,
+    peppol: validation.peppol
+      ? { valid: validation.peppol.summary["@status"] === "valid", rules: validation.peppol["@rules"], findings: peppolFindings }
+      : null,
   };
 }
 
 export function statusOf(report: Report): NodeStatus {
-  if (!report.valid) return "invalid";
+  // A file that declares Peppol BIS has to pass the Peppol rules, as an XRechnung has to pass the XRechnung rules.
+  if (!report.valid || (formatOf(report.profile) === "Peppol" && report.peppol?.valid === false)) return "invalid";
   return describeProfile(report.profile)?.en16931 ? "einvoice" : "valid";
 }

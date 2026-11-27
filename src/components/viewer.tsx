@@ -21,7 +21,7 @@ import { FILE_TYPE_LABELS, type FileType } from "@/lib/file-type";
 import { highlight, MAX_LINES } from "@/lib/highlight";
 import { parseIdoc, parseXmlIdoc } from "@/lib/idoc";
 import { openFile, type OpenedFile } from "@/lib/open-file";
-import { describeProfile, type Finding, offersXRechnung, reportFor, RULESETS } from "@/lib/report";
+import { describeProfile, type Finding, reportFor, RULESET_LABELS, RULESETS, rulesetFor, rulesetsFor } from "@/lib/report";
 import { parseLocation } from "@/lib/terms";
 import { cn } from "@/lib/utils";
 import { formatXml } from "@/lib/xml-format";
@@ -87,7 +87,7 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
     xml: parseAsBoolean.withDefault(true),
     check: parseAsBoolean.withDefault(true),
     view: parseAsStringLiteral(VIEWS).withDefault("aufbereitet"),
-    regeln: parseAsStringLiteral(RULESETS).withDefault("zugferd"),
+    regeln: parseAsStringLiteral(RULESETS),
     datei: parseAsString,
     ordner: parseAsString,
   });
@@ -131,8 +131,8 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
   // XML that does not parse is still shown, as plain text.
   const unparsed = useMemo(() => (isInvoice && !doc && opened.data?.xml ? highlight(opened.data.xml, "text", null).lines : []), [isInvoice, doc, opened.data]);
   const stored = details.data?.report ?? null;
-  const choosable = offersXRechnung(stored);
-  const ruleset = choosable ? query.regeln : "zugferd";
+  const rulesets = rulesetsFor(stored);
+  const ruleset = rulesetFor(stored, query.regeln);
   const report = useMemo(() => (stored ? reportFor(stored, ruleset) : null), [stored, ruleset]);
 
   const validation: Validation = recheck.isPending
@@ -272,11 +272,14 @@ export function Viewer({ id, source = ownSource, canGoBack = true }: Props) {
     check: (
       <div className="flex h-full flex-col">
         <PanelHeader title="Prüfung">
-          {choosable && (
+          {rulesets.length > 1 && (
             <Tabs value={ruleset} onValueChange={(regeln) => setQuery({ regeln })}>
               <TabsList className="h-7">
-                <TabsTrigger value="zugferd">ZUGFeRD</TabsTrigger>
-                <TabsTrigger value="xrechnung">XRechnung</TabsTrigger>
+                {rulesets.map((r) => (
+                  <TabsTrigger key={r} value={r}>
+                    {RULESET_LABELS[r]}
+                  </TabsTrigger>
+                ))}
               </TabsList>
             </Tabs>
           )}

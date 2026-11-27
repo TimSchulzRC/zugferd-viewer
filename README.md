@@ -2,7 +2,7 @@
 
 # zugferd-viewer
 
-Ablage und Prüfung für ZUGFeRD-, Factur-X- und XRechnung-Dateien (PDF oder XML).
+Ablage und Prüfung für ZUGFeRD-, Factur-X- und XRechnung-Dateien (PDF oder XML), dazu Peppol-UBL-Rechnungen für die Slowakei.
 
 - **Dateimanager.** Ordner in beliebiger Tiefe, Hochladen per Drag-and-drop (auch ganze Ordner), Umbenennen, Verschieben, Löschen, Mehrfachauswahl, Download einzeln oder als Zip. Rechtsklick öffnet das Kontextmenü.
 - **Viewer.** Links die PDF, daneben das eingebettete XML als aufbereitete Rechnung oder im Rohformat, rechts das Prüfergebnis mit den betroffenen BT-Codes. Ein Klick auf einen Befund markiert die Stelle im XML.
@@ -126,7 +126,7 @@ Danach in Claude Code `/mcp` aufrufen und „zugferd“ anmelden. Der Browser ö
 | --- | --- |
 | `list_folder` | Inhalt eines Ordners, ohne Angabe die oberste Ebene, mit Typ, Format und Prüfstatus |
 | `find_files` | Dateien über alles hinweg, was die Person sieht, nach Name, Status oder Typ, auch nur unter einem Ordner |
-| `get_file` | Datei, Ordnerpfad und gespeicherter Prüfbericht mit allen Befunden, Regel-IDs, XPath und BT-Codes; wahlweise als XRechnung gelesen |
+| `get_file` | Datei, Ordnerpfad und gespeicherter Prüfbericht mit allen Befunden, Regel-IDs, XPath und BT-Codes; wahlweise als XRechnung oder für die Slowakei gelesen |
 | `read_file` | Inhalt als Text, bei einer PDF das eingebettete Rechnungs-XML, lange Dateien in Teilen |
 | `validate_file` | Prüft eine Rechnung, die Claude mitbringt (XML als Text, PDF oder XML als Base64, bis 50 MB), mit demselben Validator und liefert den Bericht wie `get_file`. Datei und Ergebnis werden nirgends gespeichert |
 
@@ -157,6 +157,12 @@ Die App prüft nicht selbst. Beim Hochladen schickt sie die Datei an [Mustang](h
 Als E-Rechnung im Sinne von § 14 UStG zeigt die App eine Datei nur an, wenn sie gültig ist und ein Profil nutzt, das EN 16931 abdeckt (BASIC, EN 16931, EXTENDED, XRechnung). MINIMUM und BASIC WL sind gültiges ZUGFeRD, aber keine Rechnung.
 
 Die Mustang-Version steht in `validator/Dockerfile` (`MUSTANG_VERSION`). Neue Regelstände kommen mit einer neuen Mustang-Version. „Erneut prüfen“ im Viewer prüft eine gespeicherte Datei mit dem aktuellen Stand.
+
+### Slowakei
+
+Ab 1. Januar 2027 verlangt die Slowakei für Inlandsrechnungen Peppol BIS Billing 3.0 in UBL. Eine eigene slowakische CIUS gibt es nicht. Die slowakischen Regeln SK-R-001 bis SK-R-007 stehen in den Peppol-Regeln selbst, erstmals im Stand 2026.11 (BIS 3.1.0).
+
+Für UBL-Dateien führt der Validator deshalb nach Mustang zusätzlich die Peppol-Schematron-Regeln aus, als XSLT aus [phive-rules-peppol](https://github.com/phax/phive-rules) (`PHIVE_PEPPOL_VERSION` und `PEPPOL_RULES` in `validator/Dockerfile`). In der Dateiliste steht bei solchen Rechnungen das Format „Peppol“, im Viewer erscheint neben „ZUGFeRD“ und „XRechnung“ der Reiter „Slowakei“. Gültig ist die Rechnung dort, wenn sie Mustang (XSD, EN 16931) und die Peppol-Regeln ohne Fehler besteht. Die SK-R-Regeln sind in diesem Stand Warnungen. CII-Dateien und PDFs bekommen den Reiter nicht, die Slowakei nimmt nur UBL an. Dateien, die vor dieser Version geprüft wurden, zeigen den Reiter erst nach „Erneut prüfen“.
 
 ## BT-Codes
 
